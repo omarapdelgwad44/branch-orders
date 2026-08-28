@@ -159,6 +159,12 @@ var ROUTES = (function () {
   function reportsCsv(body, user) {
     return Reports.csv(String(body.kind || 'orders'), body.filters || {});
   }
+  function setupFirstAdmin(body) {
+    return createFirstAdmin(String(body.username || ''), String(body.password || ''), String(body.full_name || ''));
+  }
+  function setupDemo(body) {
+    return loadDemoData();
+  }
 
   return {
     'system.status': { guard: 'public', handler: sysStatus },
@@ -195,6 +201,8 @@ var ROUTES = (function () {
     'reports.branches': { guard: 'admin', handler: reportsBranch },
     'reports.items': { guard: 'admin', handler: reportsItems },
     'reports.shortages': { guard: 'admin', handler: reportsShortages },
-    'reports.csv': { guard: 'admin', handler: reportsCsv }
+    'reports.csv': { guard: 'admin', handler: reportsCsv },
+    'system.setup.firstAdmin': { guard: 'public', handler: setupFirstAdmin },
+    'system.setup.demo': { guard: 'public', handler: setupDemo }
   };
 })();

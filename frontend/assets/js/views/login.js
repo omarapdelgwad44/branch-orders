@@ -111,14 +111,12 @@ async function checkStatus(app) {
   if (!note) return;
   try {
     const status = await api('system.status');
-    if (status.needsSetup) {
-      if (isLocalMode() && status.sheetsReady !== false) {
-        note.innerHTML = firstRunCard();
-        bindFirstRun(note);
-      } else {
-        note.innerHTML = '<span class="note-ic">' + icon('ghost', 15) + '</span>' +
-          esc(t('firstRun.text'));
-      }
+    if (status.needsSetup && (isLocalMode() || isConfigured())) {
+      note.innerHTML = firstRunCard();
+      bindFirstRun(note);
+    } else if (status.needsSetup) {
+      note.innerHTML = '<span class="note-ic">' + icon('ghost', 15) + '</span>' +
+        esc(t('firstRun.text'));
     }
   } catch (err) {
     if (err.code === 'setup_error') {

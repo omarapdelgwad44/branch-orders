@@ -21,11 +21,26 @@ export const CONFIG = {
     token: 'bo.token',
     session: 'bo.session',
     lang: 'bo.lang',
-    apiUrl: 'bo.apiUrl'
+    apiUrl: 'bo.apiUrl',
+    mode: 'bo.mode'
   }
 };
 
-export const isLocalMode = () => CONFIG.DATA_MODE === 'local';
+const MODE_KEY = CONFIG.STORAGE_KEYS.mode;
+
+/**
+ * Runtime data mode. Defaults to 'local' (CONFIG.DATA_MODE) but any browser
+ * can switch to the shared 'google' mode via ?api=<Apps Script /exec URL>
+ * (or back with a bare ?api=). The chosen mode persists per browser.
+ */
+export function effectiveDataMode() {
+  try {
+    if (localStorage.getItem(MODE_KEY) === 'google') return 'google';
+  } catch (e) { /* ignore */ }
+  return CONFIG.DATA_MODE;
+}
+
+export const isLocalMode = () => effectiveDataMode() === 'local';
 
 const OVERRIDE_KEY = CONFIG.STORAGE_KEYS.apiUrl;
 
@@ -39,13 +54,22 @@ function effectiveApiUrl() {
  * Local testing override: open the app with ?api=<local mock URL>
  * e.g.  http://localhost:8080/?api=http://localhost:8787/exec
  * The override is stored in localStorage and cleared by a bare ?api=
+ *
+ * Shared-data mode: ?api=https://script.google.com/macros/s/.../exec also
+ * switches THIS browser from 'local' to the shared 'google' data mode, so
+ * the same browser always talks to the shared Google Sheets backend.
  */
 export function captureApiOverride() {
   try {
     const m = /[?&]api=([^&#]*)/.exec(location.search || '');
     if (m) {
-      if (m[1]) localStorage.setItem(OVERRIDE_KEY, decodeURIComponent(m[1]));
-      else localStorage.removeItem(OVERRIDE_KEY);
+      if (m[1]) {
+        localStorage.setItem(OVERRIDE_KEY, decodeURIComponent(m[1]));
+        localStorage.setItem(MODE_KEY, 'google');
+      } else {
+        localStorage.removeItem(OVERRIDE_KEY);
+        localStorage.removeItem(MODE_KEY);
+      }
     }
   } catch (e) { /* ignore */ }
 }

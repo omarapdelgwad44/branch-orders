@@ -4,7 +4,7 @@
  * In 'google' mode it calls the Apps Script Web App with Content-Type
  * text/plain (avoids CORS preflight).
  */
-import { CONFIG, isConfigured, getApiUrl, captureApiOverride } from './config.js';
+import { CONFIG, isConfigured, getApiUrl, captureApiOverride, effectiveDataMode } from './config.js';
 import { dispatch } from './backend/routes.js';
 import { runSetup } from './backend/bootstrap.js';
 
@@ -39,7 +39,7 @@ export class ApiError extends Error {
 export async function api(action, payload = {}) {
   const body = Object.assign({ action, token: _token }, payload);
 
-  if (CONFIG.DATA_MODE === 'local') {
+  if (effectiveDataMode() === 'local') {
     localReady();
     const r = dispatch(body.action, body);
     if (!r.ok) throw new ApiError(r.error.code, r.error.message, r.error.details);
