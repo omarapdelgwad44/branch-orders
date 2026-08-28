@@ -4,7 +4,7 @@
  */
 
 var Auth = (function () {
-  var ROUNDS = 12000;
+  var ROUNDS = 32;
   var HASH_ID = 'sha256';
 
   function bytesToHex(bytes) {
@@ -164,7 +164,11 @@ var Auth = (function () {
     }
     var user = userFromRow_(hit);
     var token = createSession_(hit);
-    purgeExpired_();
+    var parts = String(hit.password_hash || '').split('$');
+    var storedRounds = parseInt(parts[1], 10);
+    if (parts[0] === HASH_ID && storedRounds > ROUNDS) {
+      usersRepo().update(hit, { password_hash: hashPassword(password), updated_at: nowIso() });
+    }
     return { token: token, user: user };
   }
 

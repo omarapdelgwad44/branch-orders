@@ -37,7 +37,30 @@ function sheetsAreReady_() {
 }
 
 function ensureSetup_() {
-  if (!sheetsAreReady_()) setupSystem();
+  var props = PropertiesService.getScriptProperties();
+  if (props.getProperty('SYS_READY') !== '1') {
+    if (!sheetsAreReady_()) setupSystem();
+    props.setProperty('SYS_READY', '1');
+  }
+  speedUpDemoPasswords_(props);
+}
+
+function speedUpDemoPasswords_(props) {
+  props = props || PropertiesService.getScriptProperties();
+  if (props.getProperty('PWD_FAST') === '1') return;
+  var p = 'Demo@1234';
+  var names = { 'admin.demo': true, 'ali.ahmed': true, 'mona.hassan': true, 'kareem.said': true };
+  var repo = SheetsRepo.repo('Users');
+  var rows = repo.readAll();
+  for (var i = 0; i < rows.length; i++) {
+    if (!names[String(rows[i].username || '')]) continue;
+    var parts = String(rows[i].password_hash || '').split('$');
+    var rounds = parseInt(parts[1], 10);
+    if (parts[0] === 'sha256' && rounds > 32) {
+      repo.update(rows[i], { password_hash: Auth.hashPassword(p), updated_at: nowIso() });
+    }
+  }
+  props.setProperty('PWD_FAST', '1');
 }
 
 function createFirstAdmin(username, password, fullName) {

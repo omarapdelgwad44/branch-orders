@@ -1,9 +1,9 @@
 /**
  * API client for the Apps Script Web App.
  *
- * Google 302s POST /exec to googleusercontent.com/macros/echo. Browsers often
- * follow that as GET, which returns HTML or a health-check JSON. We POST with
- * credentials omitted, then fall back to GET ?payload= if needed.
+ * Prefer GET ?payload= for typical calls. Browsers follow Google's POST 302 as
+ * GET and that wasted a full round-trip (~10–30s) before the real request.
+ * POST is used only when the body is too large for a query string.
  */
 import { CONFIG, isConfigured, getApiUrl, captureApiOverride } from './config.js';
 
@@ -37,8 +37,22 @@ function isHealthCheck(json) {
 }
 
 async function readJson(res) {
-  const text = await res.text();
-  return tryParse(text);
+  return tryParse(await res.text());
+}
+
+function encodedPayload(body) {
+  return encodeURIComponent(JSON.stringify(body));
+}
+
+async function getExec(body) {
+  const q = encodedPayload(body);
+  if (q.length > 1800) return null;
+  const res = await fetch(getApiUrl() + '?payload=' + q, {
+    method: 'GET',
+    credentials: 'omit',
+    redirect: 'follow'
+  });
+  return readJson(res);
 }
 
 async function postExec(body) {
@@ -52,17 +66,6 @@ async function postExec(body) {
   return readJson(res);
 }
 
-async function getExec(body) {
-  const q = encodeURIComponent(JSON.stringify(body));
-  if (q.length > 1800) return null;
-  const res = await fetch(getApiUrl() + '?payload=' + q, {
-    method: 'GET',
-    credentials: 'omit',
-    redirect: 'follow'
-  });
-  return readJson(res);
-}
-
 export async function api(action, payload = {}) {
   if (!isConfigured()) {
     throw new ApiError('setup_error', 'Backend is not configured yet.');
@@ -70,21 +73,18 @@ export async function api(action, payload = {}) {
   const body = Object.assign({ action, token: _token }, payload);
   let json;
   try {
-    json = await postExec(body);
-    if (!json || isHealthCheck(json)) json = await getExec(body);
+    json = await getExec(body);
+    if (!json || isHealthCheck(json)) json = await postExec(body);
   } catch (e) {
     throw new ApiError('network', 'Could not reach the backend. Check your connection and the Apps Script URL.');
   }
-  if (!json) {
+  if (!json || isHealthCheck(json)) {
     throw new ApiError('bad_response', 'The backend returned an invalid response.');
   }
   if (json.ok !== true) {
     const code = (json.error && json.error.code) || 'error';
     const message = (json.error && json.error.message) || 'Request failed';
     throw new ApiError(code, message, json.error && json.error.details);
-  }
-  if (isHealthCheck(json)) {
-    throw new ApiError('bad_response', 'The backend returned an invalid response.');
   }
   return json.data;
 }

@@ -115,7 +115,18 @@ async function checkStatus(app) {
     return;
   }
   try {
-    const status = await api('system.status');
+    let status = null;
+    try {
+      const raw = sessionStorage.getItem('bo.sysStatus');
+      if (raw) {
+        const c = JSON.parse(raw);
+        if (c && c.data && Date.now() - c.at < 600000) status = c.data;
+      }
+    } catch (e) { /* ignore */ }
+    if (!status) {
+      status = await api('system.status');
+      try { sessionStorage.setItem('bo.sysStatus', JSON.stringify({ at: Date.now(), data: status })); } catch (e) { /* ignore */ }
+    }
     if (status.needsSetup) {
       note.innerHTML = firstRunCard();
       bindFirstRun(note);

@@ -17,17 +17,20 @@ var SHEET_HEADERS = Object.freeze({
 });
 
 var SheetsRepo = (function () {
+  var ssCache_ = null;
   function ss_() {
+    if (ssCache_) return ssCache_;
     var active = SpreadsheetApp.getActiveSpreadsheet();
-    if (active) return active;
+    if (active) { ssCache_ = active; return ssCache_; }
     var props = PropertiesService.getScriptProperties();
     var id = props.getProperty('SPREADSHEET_ID');
     if (id) {
-      try { return SpreadsheetApp.openById(id); } catch (e) { /* recreate below */ }
+      try { ssCache_ = SpreadsheetApp.openById(id); return ssCache_; } catch (e) { /* recreate below */ }
     }
     var created = SpreadsheetApp.create('Branch Orders');
     props.setProperty('SPREADSHEET_ID', created.getId());
-    return created;
+    ssCache_ = created;
+    return ssCache_;
   }
 
   function sheet_(name) {
