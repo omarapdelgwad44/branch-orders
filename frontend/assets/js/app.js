@@ -1,7 +1,7 @@
 /**
  * App shell + hash router + session gate.
  */
-import { setLang, t } from './i18n.js';
+import { setLang, getLang, t } from './i18n.js';
 import { getSessionUser, setSessionUser } from './session.js';
 import { api, setToken } from './api.js';
 import { icon } from './icons.js';

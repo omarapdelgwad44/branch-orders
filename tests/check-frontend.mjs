@@ -65,6 +65,32 @@ const known = new Set([...Object.keys(DICT_AR), 'dashboard.branchLabel', 'status
 const iconMissing = [...iconsUsed].filter(n => !(n in ICON_NAMES));
 if (iconMissing.length) fail('icon() names missing in icons.js: ' + iconMissing.join(', '));
 
+// import sanity: any shared API symbol used in a file must be imported (or defined locally).
+// Catches the class of bug where a view references e.g. getLang() without importing it → blank screen.
+const sharedSymbols = ['setLang', 'getLang', 't', 'fmtDate', 'fmtNum', 'icon', 'api', 'setToken', 'getToken',
+  'setSessionUser', 'getSessionUser', 'isBranch', 'isAdmin', 'isLocalMode', 'isConfigured', 'toast', 'badge',
+  'skeletons', 'qtyControl', 'attachQty', 'confirmDialog', 'openModal', 'closeModal', 'esc', 'numberCell',
+  'fileDownload', 'debounce', 'STATUS_TYPES', 'el'];
+for (const fp of files) {
+  const src = readFileSync(fp, 'utf8');
+  const imported = new Set();
+  let m;
+  const impPat = /\bimport\s*\{([^}]*)\}\s*from\s*['"][^'"]+['"]/g;
+  while ((m = impPat.exec(src))) {
+    m[1].split(',').forEach(b => {
+      const name = b.trim().split(/\s+as\s+/)[0].split(/\s+/)[0];
+      if (name) imported.add(name.replace(/^.*?([A-Za-z_$][\w$]*)$/, '$1'));
+    });
+  }
+  for (const s of sharedSymbols) {
+    const definedLocally = new RegExp('(?:export\\s+)?(?:function\\s+' + s + '\\b|(?:const|let|var)\\s+' + s + '\\s*[=:])').test(src);
+    if (definedLocally) continue;
+    if (imported.has(s)) continue;
+    const used = new RegExp('(?<![A-Za-z0-9_$.])\\b' + s + '\\b').test(src);
+    if (used) fail(fp.replace(/^.*frontend/, 'frontend') + ' uses ' + s + '() without importing it');
+  }
+}
+
 console.log('missing AR keys:', arMissing.length === 0 ? 'none ✓' : arMissing.join(', '));
 console.log('missing EN keys:', enMissing.length === 0 ? 'none ✓' : enMissing.join(', '));
 console.log('missing icons:', iconMissing.length === 0 ? 'none ✓' : iconMissing.join(', '));
