@@ -9,11 +9,17 @@ export function installAppsScriptFetch() {
   const { sandbox } = loadBackend(build);
   sandbox.setupSystem();
 
-  globalThis.fetch = async (_url, opts = {}) => {
+  globalThis.fetch = async (url, opts = {}) => {
     const i = build.contentOutputs.length;
     const method = String((opts && opts.method) || 'GET').toUpperCase();
-    if (method === 'GET') sandbox.doGet({});
-    else sandbox.doPost({ postData: { contents: (opts && opts.body) || '{}' } });
+    if (method === 'GET') {
+      const href = String(url || '');
+      const m = /[?&]payload=([^&]*)/.exec(href);
+      if (m) sandbox.doGet({ parameter: { payload: decodeURIComponent(m[1]) } });
+      else sandbox.doGet({});
+    } else {
+      sandbox.doPost({ postData: { contents: (opts && opts.body) || '{}' } });
+    }
     const text = build.contentOutputs[i].getContent();
     return {
       ok: true,

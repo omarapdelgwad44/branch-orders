@@ -19,19 +19,25 @@ const OVERRIDE_KEY = CONFIG.STORAGE_KEYS.apiUrl;
 function effectiveApiUrl() {
   let override = null;
   try { override = localStorage.getItem(OVERRIDE_KEY); } catch (e) { override = null; }
-  return override || CONFIG.API_URL;
+  if (override && /^http:\/\/localhost(?::\d+)?\//.test(override)) return override;
+  return CONFIG.API_URL;
 }
 
 /**
- * Local testing: open with ?api=http://localhost:8787/exec
- * (cleared by a bare ?api=). Production always uses CONFIG.API_URL.
+ * Local testing only: ?api=http://localhost:8787/exec
+ * Production always uses CONFIG.API_URL (stale overrides are ignored).
  */
 export function captureApiOverride() {
   try {
     const m = /[?&]api=([^&#]*)/.exec(location.search || '');
     if (m) {
-      if (m[1]) localStorage.setItem(OVERRIDE_KEY, decodeURIComponent(m[1]));
-      else localStorage.removeItem(OVERRIDE_KEY);
+      if (m[1]) {
+        const v = decodeURIComponent(m[1]);
+        if (/^http:\/\/localhost(?::\d+)?\//.test(v)) localStorage.setItem(OVERRIDE_KEY, v);
+        else localStorage.removeItem(OVERRIDE_KEY);
+      } else {
+        localStorage.removeItem(OVERRIDE_KEY);
+      }
     }
   } catch (e) { /* ignore */ }
 }

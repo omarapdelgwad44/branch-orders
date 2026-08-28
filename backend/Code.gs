@@ -11,6 +11,14 @@ var SERVICE_NAME = 'branch-orders';
 var SERVICE_VERSION = '1.0.0';
 
 function doGet(e) {
+  var raw = e && e.parameter && (e.parameter.payload || e.parameter.q);
+  if (raw) {
+    try {
+      return handleRequest_(JSON.parse(raw));
+    } catch (err) {
+      return jsonOut_({ ok: false, error: { code: 'bad_request', message: 'Invalid payload' } });
+    }
+  }
   return jsonOut_({ ok: true, service: SERVICE_NAME, version: SERVICE_VERSION, time: nowIso() });
 }
 
@@ -21,6 +29,10 @@ function doPost(e) {
   } catch (err) {
     body = {};
   }
+  return handleRequest_(body);
+}
+
+function handleRequest_(body) {
   var action = String(body.action || '');
   var token = String(body.token || '');
   var route = ROUTES[action];
@@ -39,13 +51,14 @@ function doPost(e) {
     if (err instanceof ApiError) {
       return jsonOut_({ ok: false, error: { code: err.code, message: err.message, details: err.details } });
     }
-    Logger.log('ERROR action=' + action + ' ' + err + ' ' + err.stack);
+    Logger.log('ERROR action=' + action + ' ' + err + ' ' + (err && err.stack));
     return jsonOut_({ ok: false, error: { code: 'internal_error', message: 'Something went wrong. Please try again.' } });
   }
 }
 
 function jsonOut_(obj) {
-  var out = ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+  // TEXT (not JSON): browsers following Google's 302 otherwise get HTML / a GET health check.
+  var out = ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.TEXT);
   try {
     out.setHeaders({
       'Access-Control-Allow-Origin': '*',
