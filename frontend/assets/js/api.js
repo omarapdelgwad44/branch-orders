@@ -1,23 +1,12 @@
 /**
- * API client. In 'local' mode it dispatches straight into the in-browser
- * backend (backend/routes.js) — 100% GitHub Pages, no external service.
- * In 'google' mode it calls the Apps Script Web App with Content-Type
- * text/plain (avoids CORS preflight).
+ * API client for the Apps Script Web App.
+ * POST uses Content-Type text/plain to avoid a CORS preflight.
  */
-import { CONFIG, isConfigured, getApiUrl, captureApiOverride, effectiveDataMode } from './config.js';
-import { dispatch } from './backend/routes.js';
-import { runSetup } from './backend/bootstrap.js';
+import { CONFIG, isConfigured, getApiUrl, captureApiOverride } from './config.js';
 
 captureApiOverride();
 
 let _token = localStorage.getItem(CONFIG.STORAGE_KEYS.token) || '';
-let _localReady = false;
-function localReady() {
-  if (!_localReady) {
-    _localReady = true;
-    runSetup();
-  }
-}
 
 export function getToken() {
   return _token;
@@ -37,18 +26,10 @@ export class ApiError extends Error {
 }
 
 export async function api(action, payload = {}) {
-  const body = Object.assign({ action, token: _token }, payload);
-
-  if (effectiveDataMode() === 'local') {
-    localReady();
-    const r = dispatch(body.action, body);
-    if (!r.ok) throw new ApiError(r.error.code, r.error.message, r.error.details);
-    return r.data;
-  }
-
   if (!isConfigured()) {
     throw new ApiError('setup_error', 'Backend is not configured yet.');
   }
+  const body = Object.assign({ action, token: _token }, payload);
   let res;
   try {
     res = await fetch(getApiUrl(), {

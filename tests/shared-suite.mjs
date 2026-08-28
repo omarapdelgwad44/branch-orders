@@ -1,7 +1,6 @@
 /**
- * Shared backend test suite. Runs identically against two hosts:
- *  1. the Apps Script shim (tests/run-backend-tests.mjs)
- *  2. the browser/local backend (tests/run-local-backend-tests.mjs)
+ * Shared backend test suite. Runs against the Apps Script shim
+ * (tests/run-backend-tests.mjs).
  *
  * The host must implement:
  *   api(action, payload, token)   → envelope {ok:true,data} | {ok:false,error}

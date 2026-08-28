@@ -3,10 +3,8 @@
  * branches/users/items/availability, and reports with CSV export.
  */
 import { t, fmtDate, fmtNum } from '../i18n.js';
-import { api, setToken } from '../api.js';
+import { api } from '../api.js';
 import { icon } from '../icons.js';
-import { setSessionUser } from '../session.js';
-import { isLocalMode } from '../config.js';
 import { badge, skeletons, qtyControl, attachQty, toast, confirmDialog, openModal, closeModal, numberCell, esc, fileDownload, debounce, STATUS_TYPES } from '../ui.js';
 
 let branchesCache = [];
@@ -97,65 +95,9 @@ async function dashboard(view) {
 
     const flowWrap = '<div class="card"><div class="card-head"><h3>' + esc(t('dashboard.overview')) + '</h3></div>' + flowHtml + '</div>';
     view.insertAdjacentHTML('beforeend', flowWrap);
-
-    if (isLocalMode()) {
-      view.insertAdjacentHTML('beforeend', maintenanceCard());
-      bindMaintenance();
-    }
   } catch (e) {
     view.innerHTML = emptyState(e.message || t('msg.error'));
   }
-}
-
-function maintenanceCard() {
-  return '<div class="card"><div class="card-head"><h3>' + esc(t('maint.title')) + '</h3></div>' +
-    '<div class="maint-actions">' +
-      '<button class="btn btn-ghost" id="maintExport">' + icon('download', 15) + ' ' + esc(t('maint.export')) + '</button>' +
-      '<button class="btn btn-ghost" id="maintImport">' + icon('upload', 15) + ' ' + esc(t('maint.import')) + '</button>' +
-      '<button class="btn btn-ghost danger" id="maintReset">' + icon('trash', 15) + ' ' + esc(t('maint.reset')) + '</button>' +
-    '</div>' +
-    '<input type="file" id="maintFile" accept=".json,application/json" hidden>' +
-    '</div>';
-}
-
-function bindMaintenance() {
-  const exp = document.getElementById('maintExport');
-  const imp = document.getElementById('maintImport');
-  const res = document.getElementById('maintReset');
-  const file = document.getElementById('maintFile');
-  if (exp) exp.addEventListener('click', async () => {
-    try {
-      const db = await api('system.db.export');
-      fileDownload('branch-orders-backup.json', JSON.stringify(db, null, 2), 'application/json');
-      toast(t('maint.exportDone'), 'success');
-    } catch (e) { toast(e.message || t('msg.error'), 'error'); }
-  });
-  if (imp) imp.addEventListener('click', () => { if (file) file.click(); });
-  if (file) file.addEventListener('change', async () => {
-    const f = file.files && file.files[0];
-    if (!f) return;
-    try {
-      const doc = JSON.parse(await f.text());
-      await api('system.db.import', { doc });
-      toast(t('maint.importDone'), 'success');
-      location.hash = '#/admin';
-    } catch (e) {
-      toast(e.message || t('maint.importError'), 'error');
-    } finally {
-      file.value = '';
-    }
-  });
-  if (res) res.addEventListener('click', async () => {
-    const okc = await confirmDialog({ title: t('maint.reset'), message: t('maint.resetConfirm'), danger: true, confirmLabel: t('common.confirm') });
-    if (!okc) return;
-    try {
-      await api('system.db.reset');
-      setToken('');
-      setSessionUser(null);
-      location.hash = '#/login';
-      toast(t('maint.resetDone'), 'info');
-    } catch (e) { toast(e.message || t('msg.error'), 'error'); }
-  });
 }
 
 function actionIcon(a) {

@@ -1,0 +1,56 @@
+name: Deploy Apps Script
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'backend/**'
+      - 'scripts/deploy-appsscript.mjs'
+      - '.github/workflows/deploy-appsscript.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apps-script-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run Apps Script backend tests
+        run: node tests/run-backend-tests.mjs
+
+      - name: Install clasp
+        run: npm i -g @google/clasp@3.4.0
+
+      - name: Restore clasp credentials (from GitHub secrets)
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+          CLASP_JSON: ${{ secrets.CLASP_JSON }}
+        run: |
+          if [ -z "$CLASPRC_JSON" ] || [ -z "$CLASP_JSON" ]; then
+            echo "::error::Missing secrets. Set CLASPRC_JSON and CLASP_JSON (see README §1.5)."
+            exit 1
+          fi
+          printenv CLASPRC_JSON > "$HOME/.clasprc.json"
+          mkdir -p backend
+          printenv CLASP_JSON > backend/.clasp.json
+
+      - name: Push code to Apps Script
+        working-directory: backend
+        run: clasp push --force
+
+      - name: Keep the published /exec URL stable (redeploy same deployment)
+        working-directory: backend
+        env:
+          APPS_SCRIPT_DEPLOYMENT_ID: ${{ secrets.APPS_SCRIPT_DEPLOYMENT_ID }}
+        run: node ../scripts/deploy-appsscript.mjs

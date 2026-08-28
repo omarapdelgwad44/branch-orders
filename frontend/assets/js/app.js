@@ -9,7 +9,6 @@ import { toast } from './ui.js';
 import * as loginView from './views/login.js';
 import * as branchView from './views/branch.js';
 import * as adminView from './views/admin.js';
-import { isConfigured } from './config.js';
 
 let state = { user: getSessionUser() };
 

@@ -2,7 +2,8 @@
 node_modules/
 package-lock.json
 
-# clasp local config (contains scriptId — personal, keep out of git)
+# clasp local config / OAuth (never commit)
+.clasprc.json
 backend/.clasp.json
 backend/.claspdev.json
 

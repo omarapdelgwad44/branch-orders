@@ -99,26 +99,29 @@ globalThis.location = { search: '', hash: scenario === 'branch' ? '#/app' : '#/a
 globalThis.addEventListener = () => {};
 globalThis.removeEventListener = () => {};
 
-const backendDir = new URL('../frontend/assets/js/backend/', import.meta.url);
-const appEntry = new URL('../frontend/assets/js/app.js', import.meta.url);
-const { dispatch } = await import(new URL('routes.js', backendDir).href);
-const bootstrap = await import(backendDir + 'bootstrap.js');
+const { installAppsScriptFetch } = await import('./mock-apps-script-fetch.mjs');
+const sandbox = installAppsScriptFetch();
+sandbox.createFirstAdmin('admin', 'Admin@12345', 'System Admin');
 
-bootstrap.setupSystem();
-bootstrap.createFirstAdmin('admin', 'Admin@12345', 'System Admin');
-const adminLogin = dispatch('auth.login', { action: 'auth.login', username: 'admin', password: 'Admin@12345' });
+const apiCall = async (action, payload, token) => {
+  const res = await fetch('http://local/exec', {
+    method: 'POST',
+    body: JSON.stringify(Object.assign({ action, token: token || '' }, payload || {}))
+  });
+  return res.json();
+};
+
+const adminLogin = await apiCall('auth.login', { username: 'admin', password: 'Admin@12345' });
 const ADMIN_T = adminLogin.data.token;
-
-const AP = (action, payload, token) => dispatch(action, Object.assign({ token }, payload || {}));
 
 let targetUser, targetToken;
 if (scenario === 'branch') {
-  AP('admin.branches.create', { branch_code: 'CAIRO-1', branch_name: 'Cairo - Nasr City' }, ADMIN_T);
-  AP('admin.users.create', {
+  await apiCall('admin.branches.create', { branch_code: 'CAIRO-1', branch_name: 'Cairo - Nasr City' }, ADMIN_T);
+  await apiCall('admin.users.create', {
     username: 'ali.ahmed', password: 'Demo@1234', role: 'branch_user',
     branch_id: 'BR-001', full_name: 'Ali Ahmed'
   }, ADMIN_T);
-  const logged = AP('auth.login', { username: 'ali.ahmed', password: 'Demo@1234' });
+  const logged = await apiCall('auth.login', { username: 'ali.ahmed', password: 'Demo@1234' });
   targetUser = logged.data.user;
   targetToken = logged.data.token;
 } else {
@@ -128,13 +131,15 @@ if (scenario === 'branch') {
 store.set('bo.token', targetToken);
 store.set('bo.session', JSON.stringify(targetUser));
 
+const appEntry = new URL('../frontend/assets/js/app.js', import.meta.url);
+
 let err = null;
 try {
   await import(appEntry);
 } catch (e) {
   err = e;
 }
-await new Promise((r) => setTimeout(r, 80));
+await new Promise((r) => setTimeout(r, 200));
 
 const dw = dom.detachedWrites();
 const viewEl = dom.registry.get('view');

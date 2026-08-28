@@ -68,7 +68,7 @@ if (iconMissing.length) fail('icon() names missing in icons.js: ' + iconMissing.
 // import sanity: any shared API symbol used in a file must be imported (or defined locally).
 // Catches the class of bug where a view references e.g. getLang() without importing it → blank screen.
 const sharedSymbols = ['setLang', 'getLang', 't', 'fmtDate', 'fmtNum', 'icon', 'api', 'setToken', 'getToken',
-  'setSessionUser', 'getSessionUser', 'isBranch', 'isAdmin', 'isLocalMode', 'isConfigured', 'toast', 'badge',
+  'setSessionUser', 'getSessionUser', 'isBranch', 'isAdmin', 'isConfigured', 'toast', 'badge',
   'skeletons', 'qtyControl', 'attachQty', 'confirmDialog', 'openModal', 'closeModal', 'esc', 'numberCell',
   'fileDownload', 'debounce', 'STATUS_TYPES', 'el'];
 for (const fp of files) {

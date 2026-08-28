@@ -54,27 +54,32 @@ const go = async (hash) => {
 };
 const click = async (el) => { el.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true })); await tick(120); };
 
-const router = await import(new URL('../frontend/assets/js/backend/routes.js', import.meta.url).href);
-const bootstrap = await import(new URL('../frontend/assets/js/backend/bootstrap.js', import.meta.url));
-bootstrap.setupSystem();
-bootstrap.createFirstAdmin('admin', 'Admin@12345', 'System Admin');
+const { installAppsScriptFetch } = await import('./mock-apps-script-fetch.mjs');
+const sandbox = installAppsScriptFetch();
+sandbox.createFirstAdmin('admin', 'Admin@12345', 'System Admin');
+
+const apiCall = async (action, payload, token) => {
+  const res = await fetch('http://local/exec', {
+    method: 'POST',
+    body: JSON.stringify(Object.assign({ action, token: token || '' }, payload || {}))
+  });
+  return res.json();
+};
 
 let loginUser, token;
 if (scenario === 'branch') {
-  const d = router.dispatch;
-  const admin = d('auth.login', { action: 'auth.login', username: 'admin', password: 'Admin@12345' });
+  const admin = await apiCall('auth.login', { username: 'admin', password: 'Admin@12345' });
   const AT = admin.data.token;
-  const call = (action, payload) => d(action, Object.assign({ token: AT }, payload));
-  call('admin.branches.create', { branch_code: 'CAIRO-1', branch_name: 'Cairo - Nasr City' });
-  call('admin.users.create', {
+  await apiCall('admin.branches.create', { branch_code: 'CAIRO-1', branch_name: 'Cairo - Nasr City' }, AT);
+  await apiCall('admin.users.create', {
     username: 'ali.ahmed', password: 'Demo@1234', role: 'branch_user',
     branch_id: 'BR-001', full_name: 'Ali Ahmed'
-  });
-  const l = d('auth.login', { action: 'auth.login', username: 'ali.ahmed', password: 'Demo@1234' });
+  }, AT);
+  const l = await apiCall('auth.login', { username: 'ali.ahmed', password: 'Demo@1234' });
   loginUser = l.data.user;
   token = l.data.token;
 } else {
-  const l = router.dispatch('auth.login', { action: 'auth.login', username: 'admin', password: 'Admin@12345' });
+  const l = await apiCall('auth.login', { username: 'admin', password: 'Admin@12345' });
   loginUser = l.data.user;
   token = l.data.token;
 }

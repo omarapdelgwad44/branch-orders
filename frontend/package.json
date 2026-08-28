@@ -6,6 +6,6 @@
   "description": "Static frontend for Branch Orders — deploy on GitHub Pages",
   "scripts": {
     "serve": "npx --yes serve ./ -l 8080",
-    "syntax": "node --check assets/js/config.js && node --check assets/js/i18n.js && node --check assets/js/icons.js && node --check assets/js/api.js && node --check assets/js/ui.js && node --check assets/js/session.js && node --check assets/js/app.js && node --check assets/js/views/login.js && node --check assets/js/views/branch.js && node --check assets/js/views/admin.js && node --check assets/js/backend/constants.js && node --check assets/js/backend/sha256.js && node --check assets/js/backend/store.js && node --check assets/js/backend/auth.js && node --check assets/js/backend/activity.js && node --check assets/js/backend/catalog.js && node --check assets/js/backend/orders.js && node --check assets/js/backend/adminMetrics.js && node --check assets/js/backend/reports.js && node --check assets/js/backend/bootstrap.js && node --check assets/js/backend/routes.js && echo OK"
+    "syntax": "node --check assets/js/config.js && node --check assets/js/i18n.js && node --check assets/js/icons.js && node --check assets/js/api.js && node --check assets/js/ui.js && node --check assets/js/session.js && node --check assets/js/app.js && node --check assets/js/views/login.js && node --check assets/js/views/branch.js && node --check assets/js/views/admin.js && echo OK"
   }
 }

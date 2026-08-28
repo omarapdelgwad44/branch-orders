@@ -4,7 +4,7 @@
 
 Web app (AR/EN · RTL/LTR) لإدارة طلبات المشتريات بين الفروع: الإنشاء، المتابعة، الاستلام، وحفظ النقص.
 
-نسختان من الباك اند، تختارهما من `config.js`:
+الواجهة على GitHub Pages، والبيانات على Google Sheets عبر Apps Script:
 
 ```
 ┌─────────────────────────────┐
@@ -12,49 +12,29 @@ Web app (AR/EN · RTL/LTR) لإدارة طلبات المشتريات بين ا�
 │  frontend/                   │
 │  HTML/CSS/ES modules         │
 └──────────────┬──────────────┘
-               │
-     ┌─────────┴──────────┐
-     │  الوضع المحلي (افتراضي)   │
-     │  assets/js/backend/*   │   ← باك اند كامل داخل المتصفح
-     │  بيانات localStorage   │   ← صفر خدمات خارجية، صفر إعداد
-     └─────────┬──────────┘
-     ┌─────────┴──────────┐
-     │  وضع السحابة (اختياري)    │
-     │  Google Apps Script +    │   ← مشاركة البيانات بين كل الأجهزة
-     │  Google Sheets (بيانات)   │
-     └─────────────────────┘
+               │  POST /exec
+┌──────────────┴──────────────┐
+│  Google Apps Script + Sheets │  ← قاعدة مشتركة لكل الأجهزة
+│  backend/*.gs                │  ← ينشر تلقائياً من GitHub
+└─────────────────────────────┘
 ```
 
-- **الوضع المحلي (`DATA_MODE:'local'` — الافتراضي):** كل الباك اند يعمل داخل المتصفح (ملفات `frontend/assets/js/backend/`)، وقاعدة البيانات في `localStorage`. يكفي رفع `frontend/` على GitHub Pages — لا حسابات ولا روابط ولا CORS. البيانات محفوظة على **جهاز/متصفح المستخدم نفسه**.
-- **وضع السحابة (`DATA_MODE:'google'`):** نفس الواجهة تعمل مع Google Apps Script + Sheets (الجزء الثاني أدناه)، للفرق التي تحتاج قاعدة بيانات مشتركة بين الأجهزة.
-
-## إعداد سريع (الوضع المحلي — افتراضي، بدون أي خدمة خارجية)
+## إعداد سريع
 
 | الخطوة | أين |
 |---|---|
-| 1. أبقِ `DATA_MODE:'local'` في `frontend/assets/js/config.js` (الافتراضي) | `config.js` |
-| 2. ارفع مجلد `frontend/` على GitHub Pages عبر `git init` + دفع + workflow | github.com |
-| 3. افتح الرابط: أول دخول = أنشئ حساب الأدمن الأول (الكرت يظهر تلقائياً)، أو حمّل البيانات التجريبية بضغطة زر | المتصفح |
-
-لا تحتاج Google Sheets ولا Apps Script ولا أي مفاتيح. النسخ الاحتياطي: **لوحة الإدارة ← Backup (تصدير/استيراد JSON)**.
-
-## إعداد سريع (وضع السحابة — اختياري)
-
-| الخطوة | أين |
-|---|---|
-| 1. غيّر `DATA_MODE:'google'` وضع `API_URL` في `config.js` | `config.js` |
-| 2. أنشئ Spreadsheet جديد (احفظه باسم Branch Orders) | sheets.google.com |
-| 3. التمديدات ← Apps Script | من Spreadsheet |
-| 4. الصق محتويات `backend/*.gs` بالترتيب الموجود في `backend/` + `appsscript.json` | محرر Apps Script |
-| 5. شغّل `setupSystem()` ثم `createFirstAdmin('admin','YourPass@123','Admin User')` | المحرر (أو القائمة بعد فتح الجدول) |
-| 6. نشر ← Web app (Execute as: Me، Access: Anyone) وانقل الرابط الناتج | Apps Script → Deploy |
-| 7. ضع الرابط في `API_URL` ثم ارفع `frontend/` على GitHub Pages | `config.js` + Actions |
+| 1. أنشئ Spreadsheet جديد (احفظه باسم Branch Orders) | sheets.google.com |
+| 2. التمديدات ← Apps Script | من Spreadsheet |
+| 3. اربط المشروع بـ GitHub (مرة واحدة، §1.5) — بعدها أي تعديل على `backend/` ينشر تلقائياً | GitHub Actions + clasp |
+| 4. شغّل `setupSystem()` ثم `createFirstAdmin('admin','YourPass@123','Admin User')` | المحرر (أو القائمة بعد فتح الجدول) |
+| 5. نشر ← Web app (Execute as: Me، Access: Anyone) **مرة واحدة** وانسخ الرابط | Apps Script → Deploy |
+| 6. ضع الرابط في `API_URL` داخل `config.js` ثم ارفع `frontend/` على GitHub Pages | `config.js` + Actions |
 
 ## بنية المجلدات
 
 ```
 branch-orders/
-├── backend/              ← باك اند السحابة فقط (Apps Script — يدار بـ clasp أو لصق يدوي)
+├── backend/              ← باك اند Apps Script (ينشر تلقائياً من GitHub)
 │   ├── Code.gs           HTTP layer + ROUTES (guards: public/auth/admin)
 │   ├── Config.gs         الإعدادات والثوابت + fail()/ApiError/nowIso()
 │   ├── SheetsRepo.gs     مستودع جداول البيانات (صف أول = العناوين) + Ids
@@ -68,22 +48,23 @@ branch-orders/
 │   ├── Ui.gs              قوائم Spreadsheet (onOpen)
 │   ├── appsscript.json    Manifest
 │   └── .clasp.json.example
+├── scripts/
+│   ├── deploy-appsscript.mjs          إعادة نشر نفس رابط /exec
+│   └── setup-appsscript-github.mjs    مرة واحدة: أسرار GitHub
 ├── frontend/             ← واجهة ثابتة (ES modules، لا build step)
 │   ├── index.html
 │   ├── assets/css/styles.css
-│   ├── assets/js/config.js   ← DATA_MODE: 'local' (افتراضي) أو 'google' + API_URL
-│   ├── assets/js/app.js      راوتر + shell + guard الأدوار
-│   ├── assets/js/backend/    ← باك اند المتصفح (نفس منطق backend/ بنسخة JS):
-│   │                          routes.js (dispatch) + store.js (localStorage) + auth.js ...
+│   ├── assets/js/config.js   ← API_URL لرابط Web App
+│   ├── assets/js/api.js      يستدعي Apps Script (POST text/plain)
 │   └── assets/js/views/      login.js / branch.js / admin.js
-├── tests/                ← اختبارات Node (لا تتطلب متصفحاً)
+├── tests/                ← اختبارات Node (محاكاة SpreadsheetApp)
 │   ├── appsscript-shim.mjs   محاكاة SpreadsheetApp/LockService/Utilities...
 │   ├── shared-suite.mjs      147 اختباراً مشتركاً بين نسختي الباك اند
 │   ├── run-backend-tests.mjs     تشغيلها على باك اند Apps Script (shim)
-│   ├── run-local-backend-tests.mjs  تشغيلها على باك اند المتصفح (dispatch + localStorage stub)
 │   ├── serve-local.mjs      خادم تجريبي يحاكي API السحابة
 │   └── check-frontend.mjs    فحص مفاتيح i18n + الأيقونات
-├── .github/workflows/pages.yml  ← نشر تلقائي لـ frontend/ على Pages
+├── .github/workflows/pages.yml              ← نشر تلقائي لـ frontend/ على Pages
+├── .github/workflows/deploy-appsscript.yml  ← نشر تلقائي لـ backend/ على Apps Script
 └── package.json
 ```
 
@@ -94,10 +75,10 @@ branch-orders/
 ### 1.1 تجهيز الجدول
 
 1. افتح [sheets.google.com](https://sheets.google.com) وأنشئ جدولاً جديداً، اسمه مثلاً `Branch Orders`.
-2. من القائمة **Extensions → Apps Script** افتح المحرر (سيُحدَّث اليها مباشرة).
-3. في المحرر: الصق **كل ملف من `backend/` كـ file script منفصل** بنفس أسماء الملفات، ثم انسخ `appsscript.json` (File → Project settings → check "Show appsscript.json manifest file" ثم الصق).
-   - الترتيب لا يهم للتشغيل، لكن يُنصح بالحفاظ على بنية الملفات لو استخدمت `clasp`.
-4. احفظ وشغّل `setupSystem()` (تُنشئ كل الأوراق والعناوين؛ إعادة التشغيل آمنة جداً).
+2. من القائمة **Extensions → Apps Script** افتح المحرر (يكفي مشروع فارغ في أول مرة).
+3. ارفع الكود من GitHub (موصى به — [§1.5](#15-النشر-التلقائي-من-github--بدون-لصق-يدوي)) أو الصق الملفات يدوياً مرة واحدة:
+   - كل ملف من `backend/*.gs` كـ script منفصل بنفس الاسم + `appsscript.json` (File → Project settings → "Show appsscript.json").
+4. شغّل `setupSystem()` (تُنشئ كل الأوراق والعناوين؛ إعادة التشغيل آمنة جداً).
 
 ### 1.2 أول حساب أدمن
 
@@ -130,86 +111,86 @@ loadDemoData();
 
 > CORS: الـ API يرد بإذن لأي origin (`Access-Control-Allow-Origin: *`) ويرسل الـ POST عبر `Content-Type: text/plain` لتجنّب طلب preflight — وهذا ما يجعله يعمل من أي صفحة GitHub Pages.
 
-### 1.5 النشر عبر clasp (اختياري — أسرع للتحديثات)
+### 1.5 النشر التلقائي من GitHub — بدون لصق يدوي
 
-```bash
-npm i -g @google/clasp
-cd backend
-cp .clasp.json.example .clasp.json     # ضع scriptId الخاص بك (الإعدادات ← معرف المشروع)
-clasp login
-clasp push                              # يرفع كل .gs + appsscript.json
-clasp deploy -i <deploymentId>          # أو أنشئ deployment جديد
+أي دفع على `main` يغيّر `backend/**` يرفع الملفات إلى Apps Script ويعيد نشر **نفس** رابط `/exec` (الواجهة لا تحتاج رابطاً جديداً).
+
+هذا إعداد **مرة واحدة**. بعده المصدر هو GitHub؛ لا تعدّل في محرر Apps Script وإلا الـ Action سيستبدل التعديل.
+
+#### أ) مرة واحدة على Google
+
+1. فعّل [Apps Script API](https://script.google.com/home/usersettings) للحساب الذي يملك المشروع.
+2. من المحرر: **Project Settings** ← انسخ **Script ID**.
+3. أنشئ نشر Web app **مرة واحدة** إن لم يكن موجوداً: **Deploy → New deployment → Web app**  
+   (`Execute as: Me` · `Access: Anyone`) وانسخ الرابط `.../exec`.
+4. **Deployment ID** = الجزء الأوسط من الرابط:
+
+   `https://script.google.com/macros/s/`**`AKfycb...`**`/exec`
+
+#### ب) مرة واحدة على جهازك (Windows)
+
+```powershell
+npx @google/clasp@3.4.0 login
+
+copy backend\.clasp.json.example backend\.clasp.json
+# افتح backend\.clasp.json والصق Script ID مكان PASTE_YOUR_...
+
+node scripts/setup-appsscript-github.mjs AKfycbYOUR_DEPLOYMENT_ID
 ```
+
+السكربت يضع ثلاثة GitHub secrets: `CLASPRC_JSON` و `CLASP_JSON` و `APPS_SCRIPT_DEPLOYMENT_ID`.
+
+بدون السكربت، من **Settings → Secrets and variables → Actions**:
+
+| Secret | القيمة |
+|---|---|
+| `CLASPRC_JSON` | محتوى `%USERPROFILE%\.clasprc.json` بعد `clasp login` |
+| `CLASP_JSON` | محتوى `backend\.clasp.json` (فيه `scriptId`) |
+| `APPS_SCRIPT_DEPLOYMENT_ID` | `AKfycb...` من رابط `/exec` |
+
+#### ج) بعدها
+
+```powershell
+git add backend
+git commit -m "Update Apps Script backend"
+git push origin main
+```
+
+راقب **Actions → Deploy Apps Script**. يدوي: **Actions → Deploy Apps Script → Run workflow**.
+
+> `clasp push` يحدّث كود المحرر فقط. إعادة نشر نفس الـ deployment هي ما تجعل رابط `/exec` الحي يخدم الكود الجديد.
 
 ---
 
 ## الجزء 2 — الواجهة الأمامية (GitHub Pages)
 
-### 2.1 الوضع المحلي (افتراضي)
+### 2.1 الربط بالباك اند
 
-- `DATA_MODE:'local'` في `config.js`: لا حاجة لأي رابط. شاشة "غير موصولة" لن تظهر، وأول زيارة تعرض كرت إنشاء الأدمن الأول (أو تحميل الديمو).
-- تشغيل محلي: `npm run serve` ثم افتح `http://localhost:8080`.
-- البيانات في `localStorage` لحساب المتصفح: Backup/استيراد/إعادة تعيين من **لوحة الإدارة ← قسم الصيانة** (لا يظهر إلا في الوضع المحلي).
+`API_URL` في `frontend/assets/js/config.js` يجب أن يكون رابط Web App (ينتهي بـ `/exec`).
 
-### 2.2 ضبط وضع السحابة
-
-غيّر `DATA_MODE:'google'` في `frontend/assets/js/config.js` واستبدل `YOUR_SCRIPT_ID` برابط Web App الفعلي:
-
-```javascript
-const DATA_MODE = 'google';
-const API_URL = 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec';
-```
-
-> في وضع السحابة فقط: يعرض التطبيق شاشة "المنصة غير موصولة" حتى يُضبط الرابط (فحص `isConfigured()`).
-
-### 2.3 تشغيل محلي
+للتطوير المحلي ضد محاكاة الباك اند:
 
 ```bash
-npm run serve          # يعمل على: http://localhost:8080
-# أو:  python -m http.server 8080  (من داخل frontend/)
+npm run demo:server    # http://localhost:8787/exec
+npm run serve          # http://localhost:8080
+# ثم افتح: http://localhost:8080/?api=http://localhost:8787/exec
 ```
 
-جرب الدخول بـ `admin / YourPass@123` (أو الديمو: `admin.demo / Demo@1234` للأدمن، و`ali.ahmed / Demo@1234` للفرع).
+### 2.2 تشغيل محلي (مع السحابة الحقيقية)
 
-### 2.4 النشر على GitHub Pages
+```bash
+npm run serve          # http://localhost:8080
+```
 
-1. ارفع المشروع إلى repo جديد:
-   ```bash
-   git init && git add . && git commit -m "Branch orders app"
-   git remote add origin https://github.com/<you>/branch-orders.git
-   git push -u origin main
-   ```
-2. الـ workflow `.github/workflows/pages.yml` ينشر `frontend/` تلقائياً.
-3. من repo الإعدادات: **Settings → Pages → Source: GitHub Actions**.
-4. الرابط: `https://<you>.github.io/branch-orders/`.
+الواجهة تستدعي `API_URL` مباشرة. جرب الدخول بعد `setupSystem` / الأدمن الأول، أو الديمو: `admin.demo / Demo@1234` و `ali.ahmed / Demo@1234`.
 
-> التحديثات على الفرع الرئيسي داخل `frontend/**` تعيد النشر تلقائياً.
+### 2.3 النشر على GitHub Pages
 
-### 2.5 مشاركة البيانات بين عدة أجهزة (مجاني — Google Sheets)
+1. الـ workflow `.github/workflows/pages.yml` ينشر `frontend/` تلقائياً من `main`.
+2. من إعدادات الريبو: **Settings → Pages → Source: GitHub Actions**.
+3. الرابط: `https://<you>.github.io/branch-orders/`.
 
-الوضع الافتراضي يخزّن البيانات في متصفح كل جهاز. لمشاركة **نفس** البيانات بين
-عدة أجهزة مجاناً دون أي خدمة مدفوعة: مزامنة عبر **Google Sheets + Apps Script**
-(الملفات جاهزة ومطابقة ومختبرة في `backend/`). كالآتي:
-
-1. **نشر الباك-أند**: افتح <https://script.google.com> → مشروع جديد → ألصق
-   محتوى ملفات `backend/*.gs` (Code, Setup, AuthService, SheetsRepo, OrderService,
-   CatalogService, AdminService, ReportingService, ActivityService, Config, Ui)
-   في ملف السكربت، وغيّر اسم المشروع حسب الرغبة.
-2. **النشر**: **Deploy → New deployment → Web app**:
-   - Execute as: **Me** (منشئ المشروع)
-   - Who has access: **Anyone** (لا تقم باختيار Only my account)
-   - انسخ الرابط المفتوح الناتج (ينتهي بـ `/exec`).
-3. **ربط كل متصفح يريد المشاركة** بفتح رابط النظام مضافاً إليه الرابط:
-   ```
-   https://<you>.github.io/branch-orders/?api=https://script.google.com/macros/s/XXXX/exec
-   ```
-   يخزّن المتصفح الوضع السحابي والرابط تلقائياً، ويبقى مربوطاً من بعد ذلك.
-   (لمن أراد العودة للوضع المحلي: نفس الرابط مع `?api=` فارغة فقط.)
-4. في أول مرة: ستظهر شاشة إنشاء الأدمن الأول (تُعمل مرة واحدة على القاعدة المشتركة).
-   إن أنشأت الأدمن ثم نزلت بيانات تجريبية، سجّل الدخول بـ `admin.demo / Demo@1234` (أدمن) أو `ali.ahmed / Demo@1234` (فرع).
-
-نُرجع الضمانات كلها للخادم (عزل الفروع، الجلسات، التحقق من الأدوار)، والبيانات
-في نموذج Sheets يمكن نسخها/حذفها في أي وقت. لا توجد أي رسوم في أي مرحلة.
+> التحديثات على `frontend/**` تعيد نشر الواجهة. التحديثات على `backend/**` تعيد نشر Apps Script (§1.5).
 
 ---
 
@@ -248,14 +229,11 @@ npm run serve          # يعمل على: http://localhost:8080
 ## الاختبارات
 
 ```bash
-npm test                      # نسختا الباك اند + فحص الواجهة
-npm run syntax                # فحص صياغة كل ملفات JS الأمامية (بما فيها backend/)
+npm test                      # باك اند Apps Script + فحص الواجهة
+npm run syntax                # فحص صياغة ملفات JS الأمامية
 ```
 
-- `tests/shared-suite.mjs` — 147 اختباراً مشتركاً، تُشغَّل على نسختي الباك اند:
-  - `tests/run-backend-tests.mjs` — على باك اند Apps Script (محاكاة كاملة لـ SpreadsheetApp).
-  - `tests/run-local-backend-tests.mjs` — على باك اند المتصفح (نفس الاستدعاءات عبر `dispatch()` مع localStorage stub)؛ نفس الأرقام والنواتج.
-  - تغطي: الإعداد الأولي والأدمن الأول والديمو (وتكرارهم يُرفض).
+- `tests/shared-suite.mjs` — 147 اختباراً على باك اند Apps Script (محاكاة SpreadsheetApp في `tests/run-backend-tests.mjs`):
   - الإعداد الأولي والأدمن الأول والديمو (وتكرارهم تُرفض).
   - مصادقة: نجاح/فشل/مستخدم مجهول/جلسة منتهية؛ **فحص عدم تسريب كلمات المرور في أي رد**.
   - دورة الطلب: مسودة → حفظ → إرسال → اعتماد (مع تجاوز الكميات) → معالجة → شحن → استلام كامل/ناقص (reason)، منع إعادة الاستلام، إعادة الفتح.
@@ -266,7 +244,7 @@ npm run syntax                # فحص صياغة كل ملفات JS الأما�
   - التزامنية: 40 مسودة متزامنة تنتج 40 رقم طلب فريد (المعرفات تحت LockService).
 - `tests/check-frontend.mjs` — يفحص أن كل `t('...')` موجود في AR و EN، وكل `icon('...')` موجود في icon set.
 
-> النتائج حالياً: **147/147 نجحت لكل نسخة** من الباك اند، ومفاتيح الواجهة والأيقونات مكتملة.
+> النتائج حالياً: **147/147** على باك اند Apps Script، ومفاتيح الواجهة والأيقونات مكتملة.
 
 ---
 
@@ -274,18 +252,15 @@ npm run syntax                # فحص صياغة كل ملفات JS الأما�
 
 | المشكلة | الحل |
 |---|---|
-| "المنصة غير موصولة" (وضع سحابة) | لم تُوضع `API_URL` في `config.js` أو الرابط لا ينتهي بـ `/exec` |
-| أريد التشغيل بدون أي خدمات | راجع قسم "الوضع المحلي": `DATA_MODE:'local'` هو الافتراضي ولا يحتاج شيئاً |
-| بيانات localStorage اختفت | Backup من لوحة الإدارة على جهاز/متصفح آخر، أو زر Reset — البيانات في جهاز المستخدم نفسه وليس الخادم |
-| Web App يعيد الملف الأصلي HTML بدلاً من JSON | عند الطلب الأول من متصفح قد يحدث؛ يُنصح بفتح الرابط مرة ثم إعادة التحميل. انشر `Web app` بالتحديد |
+| "المنصة غير موصولة" | لم تُوضع `API_URL` في `config.js` أو الرابط لا ينتهي بـ `/exec`، أو الـ Web app ليس Access: Anyone |
+| Web App يعيد HTML بدلاً من JSON | انشر **Web app** بالتحديد (ليس API executable). افتح الرابط مرة ثم أعد التحميل |
 | صفحة فارغة بعد الدخول | سجّل الخروج وأعد الدخول؛ تأكد أن `Users` فيها `branch_id` صحيح لمستخدم الفرع |
-| تغييرات الباك اند لا تظهر | انشر deployment جديداً في Apps Script وحدّث الرابط إن تغيّر |
+| تغييرات الباك اند لا تظهر | تأكد أن Action `Deploy Apps Script` نجح على `main`، وأن سر `APPS_SCRIPT_DEPLOYMENT_ID` هو نفس الجزء الأوسط من رابط `/exec` |
 | أرقام الطلبات بدأت من رقمك الحالي | التعذيذ سجّل Sequencer في `Settings` (`seq.order`). لن تختفي الأرقام من دون مسح هذه الخلايا |
 | بيانات مفقودة | انسخ الجدول (النسخ الاحتياطي) — لا تحذف أوراق تحت التطبيق |
 
 ## النسخ الاحتياطي
 
-- **الوضع المحلي:** لوحة الإدارة ← قسم الصيانة ← **تصدير نسخة JSON / استيرادتها** (يوجد أيضاً Reset). البيانات في متصفحك؛ نقلها لجهاز آخر يتم بالنسخة المصدَّرة.
-- **وضع السحابة:** الجدول هو قاعدة البيانات: «File → Make a copy» يكفي كنسخة احتياطية، وبعدها عودة الرابط للنسخة.
+الجدول هو قاعدة البيانات: «File → Make a copy» يكفي كنسخة احتياطية.
 
-> ملاحظة: المشروع حالياً ليس repo git؛ ابدأ بـ `git init` كما في قسم النشر.
+> ملاحظة: الواجهة تُنشر من `frontend/` عبر Pages؛ الباك اند يُنشر من `backend/` عبر `Deploy Apps Script`.

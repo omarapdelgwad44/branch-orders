@@ -5,7 +5,7 @@
 import { setLang, getLang, t } from '../i18n.js';
 import { api } from '../api.js';
 import { icon } from '../icons.js';
-import { isConfigured, isLocalMode } from '../config.js';
+import { isConfigured } from '../config.js';
 
 export function render(app, { onLogin }) {
   setLang(getLang());
@@ -109,14 +109,16 @@ function bind(app, onLogin) {
 async function checkStatus(app) {
   const note = document.getElementById('loginNote');
   if (!note) return;
+  if (!isConfigured()) {
+    note.innerHTML = '<span class="note-ic">' + icon('alert', 15) + '</span>' +
+      esc(t('setupError.text'));
+    return;
+  }
   try {
     const status = await api('system.status');
-    if (status.needsSetup && (isLocalMode() || isConfigured())) {
+    if (status.needsSetup) {
       note.innerHTML = firstRunCard();
       bindFirstRun(note);
-    } else if (status.needsSetup) {
-      note.innerHTML = '<span class="note-ic">' + icon('ghost', 15) + '</span>' +
-        esc(t('firstRun.text'));
     }
   } catch (err) {
     if (err.code === 'setup_error') {
