@@ -1,0 +1,12 @@
+{
+  "name": "branch-orders",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Branch ordering web app — pure-client backend (localStorage) on GitHub Pages, optional Google Apps Script backend",
+  "scripts": {
+    "test": "node tests/run-backend-tests.mjs && node tests/run-local-backend-tests.mjs && node tests/check-frontend.mjs",
+    "syntax": "npm --prefix frontend run syntax",
+    "serve": "npm --prefix frontend run serve",
+    "demo:server": "node tests/serve-local.mjs"
+  }
+}

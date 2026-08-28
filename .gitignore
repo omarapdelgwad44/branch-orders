@@ -1,0 +1,15 @@
+# dependencies / local tooling
+node_modules/
+package-lock.json
+
+# clasp local config (contains scriptId — personal, keep out of git)
+backend/.clasp.json
+backend/.claspdev.json
+
+# logs & OS junk
+*.log
+.DS_Store
+Thumbs.db
+
+# test scratch
+tests/tmp/
