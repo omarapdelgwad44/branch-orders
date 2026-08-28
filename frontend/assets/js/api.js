@@ -66,6 +66,11 @@ async function postExec(body) {
   return readJson(res);
 }
 
+export function warmup() {
+  if (!isConfigured()) return;
+  fetch(getApiUrl(), { method: 'GET', credentials: 'omit', cache: 'no-store' }).catch(function () {});
+}
+
 export async function api(action, payload = {}) {
   if (!isConfigured()) {
     throw new ApiError('setup_error', 'Backend is not configured yet.');

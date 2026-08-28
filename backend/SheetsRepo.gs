@@ -18,6 +18,13 @@ var SHEET_HEADERS = Object.freeze({
 
 var SheetsRepo = (function () {
   var ssCache_ = null;
+  var sheetCache_ = {};
+  var rowsCache_ = {};
+
+  function invalidate_(name) {
+    delete rowsCache_[name];
+  }
+
   function ss_() {
     if (ssCache_) return ssCache_;
     var active = SpreadsheetApp.getActiveSpreadsheet();
@@ -34,8 +41,10 @@ var SheetsRepo = (function () {
   }
 
   function sheet_(name) {
+    if (sheetCache_[name]) return sheetCache_[name];
     var sh = ss_().getSheetByName(name);
     if (!sh) throw new ApiError('config_error', 'Missing sheet: ' + name);
+    sheetCache_[name] = sh;
     return sh;
   }
 
@@ -47,6 +56,8 @@ var SheetsRepo = (function () {
         sh.getRange(1, 1, 1, headers.length).setValues([headers]);
         sh.setFrozenRows(1);
       }
+      sheetCache_[name] = sh;
+      invalidate_(name);
       return sh;
     }
     if (headers && headers.length) ensureHeaders_(sh, headers);
@@ -81,9 +92,13 @@ var SheetsRepo = (function () {
   };
 
   Repo.prototype.readAll = function () {
+    if (rowsCache_[this.sheetName]) return rowsCache_[this.sheetName];
     var sh = sheet_(this.sheetName);
     var lastRow = sh.getLastRow();
-    if (lastRow < 2) return [];
+    if (lastRow < 2) {
+      rowsCache_[this.sheetName] = [];
+      return rowsCache_[this.sheetName];
+    }
     var values = sh.getRange(2, 1, lastRow - 1, this.headers.length).getValues();
     var out = [];
     for (var r = 0; r < values.length; r++) {
@@ -91,6 +106,7 @@ var SheetsRepo = (function () {
       for (var c = 0; c < this.headers.length; c++) row[this.headers[c]] = values[r][c];
       out.push(row);
     }
+    rowsCache_[this.sheetName] = out;
     return out;
   };
 
@@ -113,8 +129,10 @@ var SheetsRepo = (function () {
       values.push(patch[this.headers[i]] !== undefined ? patch[this.headers[i]] : '');
     }
     sh.appendRow(values);
-    var row = this.readAll();
-    return row[row.length - 1];
+    var row = { __row: sh.getLastRow() };
+    for (var c = 0; c < this.headers.length; c++) row[this.headers[c]] = values[c];
+    invalidate_(this.sheetName);
+    return row;
   };
 
   Repo.prototype.update = function (row, patch) {
@@ -127,6 +145,7 @@ var SheetsRepo = (function () {
       if (colIndex[k]) sh.getRange(row.__row, colIndex[k]).setValue(patch[k]);
     }
     for (var m = 0; m < keys.length; m++) row[keys[m]] = patch[keys[m]];
+    invalidate_(this.sheetName);
     return row;
   };
 

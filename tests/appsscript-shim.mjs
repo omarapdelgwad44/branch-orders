@@ -117,6 +117,7 @@ export function buildContext() {
   const workbook = createWorkbook();
   const lock = createLock();
   const props = new Map();
+  const cacheMap = new Map();
   const contentOutputs = [];
 
   const context = {
@@ -154,10 +155,10 @@ export function buildContext() {
     },
     CacheService: {
       getScriptCache() {
-        const map = new Map();
         return {
-          get(k) { return map.get(k) ?? null; },
-          put(k, v) { map.set(k, v); return this; },
+          get(k) { return cacheMap.get(k) ?? null; },
+          put(k, v) { cacheMap.set(k, v); return this; },
+          remove(k) { cacheMap.delete(k); return this; },
         };
       },
     },

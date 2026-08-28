@@ -3,11 +3,12 @@
  * follows the authenticated role to the right dashboard.
  */
 import { setLang, getLang, t } from '../i18n.js';
-import { api } from '../api.js';
+import { api, warmup } from '../api.js';
 import { icon } from '../icons.js';
 import { isConfigured } from '../config.js';
 
 export function render(app, { onLogin }) {
+  warmup();
   setLang(getLang());
   app.innerHTML = layout();
   bind(app, onLogin);

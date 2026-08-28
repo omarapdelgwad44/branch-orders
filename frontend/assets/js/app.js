@@ -3,7 +3,7 @@
  */
 import { setLang, getLang, t } from './i18n.js';
 import { getSessionUser, setSessionUser } from './session.js';
-import { api, setToken } from './api.js';
+import { api, setToken, warmup } from './api.js';
 import { icon } from './icons.js';
 import { toast } from './ui.js';
 import * as loginView from './views/login.js';
@@ -211,6 +211,8 @@ function notFound() {
 
 export function start() {
   setLang(getLang());
+  warmup();
+  setInterval(warmup, 4 * 60 * 1000);
   render();
   window.addEventListener('hashchange', render);
 }
