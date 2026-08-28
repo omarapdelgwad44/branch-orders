@@ -17,7 +17,18 @@ var SHEET_HEADERS = Object.freeze({
 });
 
 var SheetsRepo = (function () {
-  function ss_() { return SpreadsheetApp.getActiveSpreadsheet(); }
+  function ss_() {
+    var active = SpreadsheetApp.getActiveSpreadsheet();
+    if (active) return active;
+    var props = PropertiesService.getScriptProperties();
+    var id = props.getProperty('SPREADSHEET_ID');
+    if (id) {
+      try { return SpreadsheetApp.openById(id); } catch (e) { /* recreate below */ }
+    }
+    var created = SpreadsheetApp.create('Branch Orders');
+    props.setProperty('SPREADSHEET_ID', created.getId());
+    return created;
+  }
 
   function sheet_(name) {
     var sh = ss_().getSheetByName(name);
@@ -163,11 +174,7 @@ var Ids = (function () {
     var lock = LockService.getScriptLock();
     lock.waitLock(15000);
     try {
-      var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Settings');
-      if (!sh) {
-        SheetsRepo.ensure('Settings', SHEET_HEADERS.Settings);
-        sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Settings');
-      }
+      SheetsRepo.ensure('Settings', SHEET_HEADERS.Settings);
       var cur = 0;
       var repo = SheetsRepo.repo('Settings');
       var row = repo.find('key', key);

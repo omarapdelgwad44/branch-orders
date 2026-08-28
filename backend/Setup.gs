@@ -20,7 +20,15 @@ function setupSystem() {
 }
 
 function sheetsAreReady_() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss;
+  try { ss = SpreadsheetApp.getActiveSpreadsheet(); } catch (e) { ss = null; }
+  if (!ss) {
+    try {
+      var id = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
+      if (id) ss = SpreadsheetApp.openById(id);
+    } catch (e2) { ss = null; }
+  }
+  if (!ss) return false;
   var need = Object.keys(SHEET_HEADERS);
   for (var i = 0; i < need.length; i++) {
     if (!ss.getSheetByName(need[i])) return false;
