@@ -144,7 +144,6 @@ async function logout() {
 
 function render() {
   const route = match();
-  const view = document.getElementById('view');
   const app = document.getElementById('app');
 
   if (!state.user) {
@@ -159,6 +158,7 @@ function render() {
   }
 
   renderShell(state.user);
+  const view = document.getElementById('view');
 
   const user = state.user;
   const adminOnly = ['admin.dashboard', 'admin.orders', 'admin.order', 'admin.branches', 'admin.users', 'admin.items', 'admin.availability', 'admin.reports'];
