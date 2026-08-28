@@ -127,6 +127,12 @@ function loadDemoData() {
   });
 
   var p = 'Demo@1234';
+  var uA = users.insert({
+    user_id: Ids.userId(), username: 'admin.demo', email: 'admin@demo.local',
+    password_hash: Auth.hashPassword(p), password_salt: '', full_name: 'System Admin (Demo)',
+    role: USER_ROLES.ADMIN, branch_id: '', status: USER_STATUS.ACTIVE,
+    created_at: nowIso(), updated_at: nowIso(), last_login_at: ''
+  });
   var u1 = users.insert({
     user_id: Ids.userId(), username: 'ali.ahmed', email: 'ali@demo.local',
     password_hash: Auth.hashPassword(p), password_salt: '', full_name: 'Ali Ahmed Saleh',
@@ -154,8 +160,9 @@ function loadDemoData() {
     { 'ITM-5': { req: 20, appr: 20 }, 'ITM-7': { req: 30, appr: 30 } });
 
   SheetsRepo.setSetting('DEMO_LOADED', 'true');
+  SheetsRepo.setSetting('FIRST_ADMIN_CREATED', 'true');
   Activity.log(u1.user_id, 'demo_data_loaded', 'system', 'demo', {});
-  return { ok: true, message: 'Demo data loaded.' };
+  return { ok: true, message: 'Demo data loaded. Admin: admin.demo / Demo@1234.' };
 }
 
 function seedOrder(orderItems, orders, branchId, by, status, lines) {

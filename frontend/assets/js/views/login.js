@@ -177,7 +177,7 @@ function bindFirstRun(note) {
       try {
         await api('system.setup.demo');
         note.innerHTML = '<span class="note-ic">' + icon('check', 15) + '</span>' +
-          esc(t('firstRun.demoLoaded', { user: 'ali.ahmed', pass: 'Demo@1234' }));
+          esc(t('firstRun.demoLoaded', { admin: 'admin.demo', branch: 'ali.ahmed', pass: 'Demo@1234' }));
       } catch (err) {
         demo.disabled = false;
         demo.textContent = t('firstRun.demoBtn');

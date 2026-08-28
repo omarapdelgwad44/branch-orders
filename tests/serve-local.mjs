@@ -70,7 +70,8 @@ server.listen(PORT, () => {
   console.log('  API:   http://localhost:' + PORT + '/exec');
   console.log('');
   console.log('  admin       : admin    / Admin@12345');
-  console.log('  branch user : ali.ahmed / Demo@1234   (Cairo - Nasr City)');
+  console.log('  admin      : admin.demo / Demo@1234');
+  console.log('  branch user: ali.ahmed / Demo@1234   (Cairo - Nasr City)');
   console.log('  branch user : mona.hassan / Demo@1234 (Alexandria)');
   console.log('  branch user : kareem.said / Demo@1234 (Giza)');
   console.log('');

@@ -426,7 +426,7 @@ async function manageBranches(view) {
       branchForm(b);
     }));
     function branchForm(b) {
-      const node = openModal({ title: b ? b.branch_name : t('manage.newBranch'), body: form(), footer: '' });
+      const node = openModal({ title: b ? b.branch_name : t('manage.newBranch'), body: form(b), footer: '' });
       node.querySelector('.modal-foot').innerHTML = '<button class="btn btn-ghost" data-cancel>' + esc(t('common.cancel')) + '</button><button class="btn btn-primary" id="saveBranch">' + esc(t('common.save')) + '</button>';
       node.querySelector('[data-cancel]').addEventListener('click', closeModal);
       document.getElementById('saveBranch').addEventListener('click', async () => {
@@ -445,8 +445,8 @@ async function manageBranches(view) {
         } catch (e) { toast(e.message || t('msg.error'), 'error'); }
       });
     }
-    function form() {
-      const v = b || {};
+    function form(branch) {
+      const v = branch || {};
       return '<label class="field"><span class="field-label">' + esc(t('manage.branchCode')) + '</span><input class="input" id="bc" value="' + esc(v.branch_code || '') + '"></label>' +
         '<label class="field"><span class="field-label">' + esc(t('manage.branchName')) + '</span><input class="input" id="bn" value="' + esc(v.branch_name || '') + '"></label>' +
         '<label class="field"><span class="field-label">' + esc(t('manage.location')) + '</span><input class="input" id="bl" value="' + esc(v.location || '') + '"></label>' +

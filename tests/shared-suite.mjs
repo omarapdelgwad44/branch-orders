@@ -73,6 +73,10 @@ export function runSharedSuite(host) {
   eq(st.firstAdminCreated, true, 'firstAdminCreated=true');
   eq(st.demoLoaded, true, 'demoLoaded=true');
 
+  const demoAdmin = api('auth.login', { username: 'admin.demo', password: 'Demo@1234' });
+  eq(demoAdmin.ok, true, 'demo seed includes an admin account');
+  eq(demoAdmin.ok && demoAdmin.data.user.role, 'admin', 'demo admin role=admin');
+
   let cfg = apiOk('system.config');
   eq(cfg.timezone, 'Africa/Cairo', 'config.timezone');
   eq(cfg.allowDecimalQty, false, 'config.allowDecimalQty default false');
@@ -397,7 +401,10 @@ export function runSharedSuite(host) {
   // ---------------------------------------------------------------------------
   section('G. Account & branch lifecycle');
 
-  // last active admin guard
+  // last active admin guard (demo ships a second admin, so retire it first)
+  const demoAdminId = apiOk('admin.users.list', {}, ADMIN_T).users.filter((u) => u.username === 'admin.demo')[0].user_id;
+  const retireDemoAdmin = api('admin.users.update', { user_id: demoAdminId, status: 'inactive' }, ADMIN_T);
+  eq(retireDemoAdmin.ok, true, 'demo admin can be deactivated while another admin stays active');
   const deactivateOnlyAdmin = api('admin.users.update', { user_id: ADMIN_ID, status: 'inactive' }, ADMIN_T);
   eq(deactivateOnlyAdmin.ok, false, 'cannot deactivate last active admin');
   eq(deactivateOnlyAdmin.error.code, 'last_active_admin', 'last_active_admin code');

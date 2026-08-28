@@ -41,7 +41,7 @@ function menuFirstAdmin() {
 function menuDemo() {
   try {
     loadDemoData();
-    SpreadsheetApp.getUi().alert('Demo data loaded. Log in with ali.ahmed / Demo@1234 or mona.hassan / Demo@1234.');
+    SpreadsheetApp.getUi().alert('Demo data loaded. Admin: admin.demo / Demo@1234. Branch: ali.ahmed / Demo@1234.');
   } catch (err) {
     SpreadsheetApp.getUi().alert('Failed: ' + (err.message || err));
   }

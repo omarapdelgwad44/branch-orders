@@ -117,7 +117,7 @@ loadDemoData();
 
 - فروع: `Cairo – Nasr City (BR-001)`، `Alexandria – Sidi Gaber (BR-002)`، `Giza – Dokki (BR-003)`.
 - 12 صنفاً + ربطها بكل الفروع.
-- مستخدمون (كلمة السر للجميع: `Demo@1234`): `ali.ahmed` (BR-001) · `mona.hassan` (BR-002) · `kareem.said` (BR-003).
+- مستخدمون (كلمة السر للجميع: `Demo@1234`): أدمن `admin.demo` · فروع `ali.ahmed` (BR-001) · `mona.hassan` (BR-002) · `kareem.said` (BR-003).
 - 3 طلبات في حالات مختلفة لإظهار اللوحات.
 - إعادة التشغيل ترفض (`DEMO_LOADED=true`). لإعادة التحميل امسح صف `DEMO_LOADED` من ورقة Settings.
 
@@ -169,7 +169,7 @@ npm run serve          # يعمل على: http://localhost:8080
 # أو:  python -m http.server 8080  (من داخل frontend/)
 ```
 
-جرب الدخول بـ `admin / YourPass@123` (أو حسابات الديمو `ali.ahmed / Demo@1234`).
+جرب الدخول بـ `admin / YourPass@123` (أو الديمو: `admin.demo / Demo@1234` للأدمن، و`ali.ahmed / Demo@1234` للفرع).
 
 ### 2.4 النشر على GitHub Pages
 
