@@ -139,7 +139,13 @@ export function createApp(store) {
         return { ok: false, error: { code: err.code, message: err.message, details: err.details } };
       }
       console.error('ERROR action=' + action, err && err.stack ? err.stack : err);
-      return { ok: false, error: { code: 'internal_error', message: 'Something went wrong. Please try again.' } };
+      return {
+        ok: false,
+        error: {
+          code: 'internal_error',
+          message: String((err && err.message) || 'Something went wrong. Please try again.')
+        }
+      };
     }
   }
 

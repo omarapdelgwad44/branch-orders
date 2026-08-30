@@ -84,15 +84,20 @@ export function createSetup(store, cfg, ids, activity, auth) {
     const b1 = 'BR-001';
     const b2 = 'BR-002';
     const b3 = 'BR-003';
-    await store.insert('Branches', {
+    async function ensure(table, col, val, row) {
+      const hit = await store.find(table, col, val);
+      if (hit) return hit;
+      return store.insert(table, row);
+    }
+    await ensure('Branches', 'branch_id', b1, {
       branch_id: b1, branch_code: 'CAIRO-1', branch_name: 'Cairo - Nasr City', location: 'Nasr City, Cairo',
       status: USER_STATUS.ACTIVE, created_at: now, updated_at: now
     });
-    await store.insert('Branches', {
+    await ensure('Branches', 'branch_id', b2, {
       branch_id: b2, branch_code: 'ALEX-1', branch_name: 'Alexandria - Sidi Gaber', location: 'Sidi Gaber, Alexandria',
       status: USER_STATUS.ACTIVE, created_at: now, updated_at: now
     });
-    await store.insert('Branches', {
+    await ensure('Branches', 'branch_id', b3, {
       branch_id: b3, branch_code: 'GIZA-1', branch_name: 'Giza - Dokki', location: 'Dokki, Giza',
       status: USER_STATUS.ACTIVE, created_at: now, updated_at: now
     });
@@ -114,11 +119,14 @@ export function createSetup(store, cfg, ids, activity, auth) {
     for (let i = 0; i < demoItems.length; i++) {
       const d = demoItems[i];
       const id = 'ITM-' + (i + 1);
-      await store.insert('Items', {
+      await ensure('Items', 'item_id', id, {
         item_id: id, item_code: d.item_code, item_name: d.item_name, category: d.category,
         unit: d.unit, active: true, sort_order: i + 1, created_at: now, updated_at: now
       });
+      const allBI = await store.all('Branch_Items');
       for (const bid of [b1, b2, b3]) {
+        const exists = allBI.some((r) => String(r.branch_id) === bid && String(r.item_id) === id);
+        if (exists) continue;
         await store.insert('Branch_Items', {
           branch_id: bid, item_id: id, is_available: true, max_quantity: '', updated_at: now
         });
@@ -127,26 +135,31 @@ export function createSetup(store, cfg, ids, activity, auth) {
 
     const p = 'Demo@1234';
     const hash = await hashPassword(p);
-    const uA = await store.insert('Users', {
-      user_id: await ids.userId(), username: 'admin.demo', email: 'admin@demo.local',
+    async function ensureUser(username, row) {
+      const hit = await store.find('Users', 'username', username);
+      if (hit) return hit;
+      return store.insert('Users', Object.assign({ user_id: await ids.userId() }, row));
+    }
+    await ensureUser('admin.demo', {
+      username: 'admin.demo', email: 'admin@demo.local',
       password_hash: hash, password_salt: '', full_name: 'System Admin (Demo)',
       role: USER_ROLES.ADMIN, branch_id: '', status: USER_STATUS.ACTIVE,
       created_at: now, updated_at: now, last_login_at: ''
     });
-    const u1 = await store.insert('Users', {
-      user_id: await ids.userId(), username: 'ali.ahmed', email: 'ali@demo.local',
+    const u1 = await ensureUser('ali.ahmed', {
+      username: 'ali.ahmed', email: 'ali@demo.local',
       password_hash: hash, password_salt: '', full_name: 'Ali Ahmed Saleh',
       role: USER_ROLES.BRANCH_USER, branch_id: b1, status: USER_STATUS.ACTIVE,
       created_at: now, updated_at: now, last_login_at: ''
     });
-    const u2 = await store.insert('Users', {
-      user_id: await ids.userId(), username: 'mona.hassan', email: 'mona@demo.local',
+    const u2 = await ensureUser('mona.hassan', {
+      username: 'mona.hassan', email: 'mona@demo.local',
       password_hash: hash, password_salt: '', full_name: 'Mona Hassan',
       role: USER_ROLES.BRANCH_USER, branch_id: b2, status: USER_STATUS.ACTIVE,
       created_at: now, updated_at: now, last_login_at: ''
     });
-    const u3 = await store.insert('Users', {
-      user_id: await ids.userId(), username: 'kareem.said', email: 'kareem@demo.local',
+    const u3 = await ensureUser('kareem.said', {
+      username: 'kareem.said', email: 'kareem@demo.local',
       password_hash: hash, password_salt: '', full_name: 'Kareem Said',
       role: USER_ROLES.BRANCH_USER, branch_id: b3, status: USER_STATUS.ACTIVE,
       created_at: now, updated_at: now, last_login_at: ''

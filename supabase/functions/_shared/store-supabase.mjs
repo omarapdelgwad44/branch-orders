@@ -44,6 +44,7 @@ function table(name) {
 function emptyToNull(row) {
   const out = Object.assign({}, row);
   for (const k of Object.keys(NULLABLE_NUM)) {
+    if (!Object.prototype.hasOwnProperty.call(out, k)) continue;
     if (out[k] === '' || out[k] === undefined) out[k] = null;
   }
   return out;
