@@ -1,0 +1,5 @@
+# Minimal config so `supabase functions deploy` knows JWT is off for our custom sessions.
+project_id = "branch-orders"
+
+[functions.api]
+verify_jwt = false

@@ -212,7 +212,6 @@ function notFound() {
 export function start() {
   setLang(getLang());
   warmup();
-  setInterval(warmup, 4 * 60 * 1000);
   render();
   window.addEventListener('hashchange', render);
 }

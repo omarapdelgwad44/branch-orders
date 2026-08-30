@@ -99,9 +99,9 @@ globalThis.location = { search: '', hash: scenario === 'branch' ? '#/app' : '#/a
 globalThis.addEventListener = () => {};
 globalThis.removeEventListener = () => {};
 
-const { installAppsScriptFetch } = await import('./mock-apps-script-fetch.mjs');
-const sandbox = installAppsScriptFetch();
-sandbox.createFirstAdmin('admin', 'Admin@12345', 'System Admin');
+const { installBackendFetch } = await import('./mock-apps-script-fetch.mjs');
+const sandbox = await installBackendFetch();
+await sandbox.direct.createFirstAdmin('admin', 'Admin@12345', 'System Admin');
 
 const apiCall = async (action, payload, token) => {
   const res = await fetch('http://local/exec', {
@@ -130,6 +130,7 @@ if (scenario === 'branch') {
 }
 store.set('bo.token', targetToken);
 store.set('bo.session', JSON.stringify(targetUser));
+store.set('bo.apiUrl', 'http://localhost:8787/api');
 
 const appEntry = new URL('../frontend/assets/js/app.js', import.meta.url);
 

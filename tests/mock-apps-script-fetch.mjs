@@ -1,32 +1,27 @@
 /**
- * Installs globalThis.fetch that talks to the in-memory Apps Script shim,
+ * Installs globalThis.fetch that talks to the in-memory API,
  * so frontend tests exercise the same HTTP path as production.
  */
-import { buildContext, loadBackend } from './appsscript-shim.mjs';
+import { createMemoryStore } from '../supabase/functions/_shared/store-memory.mjs';
+import { createApp, dispatchHttp } from '../supabase/functions/_shared/handle.mjs';
 
-export function installAppsScriptFetch() {
-  const build = buildContext();
-  const { sandbox } = loadBackend(build);
-  sandbox.setupSystem();
+export async function installBackendFetch() {
+  const app = createApp(createMemoryStore());
+  await app.direct.setupSystem();
 
   globalThis.fetch = async (url, opts = {}) => {
-    const i = build.contentOutputs.length;
     const method = String((opts && opts.method) || 'GET').toUpperCase();
-    if (method === 'GET') {
-      const href = String(url || '');
-      const m = /[?&]payload=([^&]*)/.exec(href);
-      if (m) sandbox.doGet({ parameter: { payload: decodeURIComponent(m[1]) } });
-      else sandbox.doGet({});
-    } else {
-      sandbox.doPost({ postData: { contents: (opts && opts.body) || '{}' } });
-    }
-    const text = build.contentOutputs[i].getContent();
+    const result = await dispatchHttp(app, method, url, (opts && opts.body) || '');
+    const text = JSON.stringify(result);
     return {
       ok: true,
-      json: async () => JSON.parse(text),
+      json: async () => result,
       text: async () => text
     };
   };
 
-  return sandbox;
+  return app;
 }
+
+/** @deprecated alias kept for older test imports */
+export const installAppsScriptFetch = installBackendFetch;

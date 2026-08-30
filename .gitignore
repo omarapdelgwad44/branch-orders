@@ -14,3 +14,9 @@ Thumbs.db
 
 # test scratch
 tests/tmp/
+
+# supabase local
+supabase/.temp/
+supabase/.branches/
+.env
+.env.*

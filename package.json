@@ -2,7 +2,7 @@
   "name": "branch-orders",
   "version": "1.0.0",
   "private": true,
-  "description": "Branch ordering web app — GitHub Pages frontend + Google Apps Script / Sheets backend",
+  "description": "Branch ordering web app — GitHub Pages frontend + Supabase backend",
   "scripts": {
     "test": "node tests/run-backend-tests.mjs && node tests/check-frontend.mjs && node tests/boot-frontend.mjs admin && node tests/boot-frontend.mjs branch && node tests/ui-click.mjs admin && node tests/ui-click.mjs branch",
     "syntax": "npm --prefix frontend run syntax",

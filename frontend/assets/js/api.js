@@ -1,11 +1,8 @@
 /**
- * API client for the Apps Script Web App.
- *
- * Prefer GET ?payload= for typical calls. Browsers follow Google's POST 302 as
- * GET and that wasted a full round-trip (~10–30s) before the real request.
- * POST is used only when the body is too large for a query string.
+ * API client for the Supabase Edge Function.
+ * POST JSON { action, token, ... } — same envelope the UI already expects.
  */
-import { CONFIG, isConfigured, getApiUrl, captureApiOverride } from './config.js';
+import { CONFIG, isConfigured, getApiUrl, getAnonKey, captureApiOverride } from './config.js';
 
 captureApiOverride();
 
@@ -32,38 +29,15 @@ function tryParse(text) {
   try { return JSON.parse(text); } catch (e) { return null; }
 }
 
-function isHealthCheck(json) {
-  return !!(json && json.ok === true && json.service && json.data === undefined && json.time);
-}
-
-async function readJson(res) {
-  return tryParse(await res.text());
-}
-
-function encodedPayload(body) {
-  return encodeURIComponent(JSON.stringify(body));
-}
-
-async function getExec(body) {
-  const q = encodedPayload(body);
-  if (q.length > 1800) return null;
-  const res = await fetch(getApiUrl() + '?payload=' + q, {
-    method: 'GET',
-    credentials: 'omit',
-    redirect: 'follow'
-  });
-  return readJson(res);
-}
-
-async function postExec(body) {
-  const res = await fetch(getApiUrl(), {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(body),
-    credentials: 'omit',
-    redirect: 'follow'
-  });
-  return readJson(res);
+function authHeaders() {
+  const headers = { 'Content-Type': 'application/json' };
+  const anon = getAnonKey();
+  if (anon) {
+    headers.apikey = anon;
+    // Legacy JWT anon keys go in Authorization. New sb_publishable_ keys are not JWTs.
+    if (anon.startsWith('eyJ')) headers.Authorization = 'Bearer ' + anon;
+  }
+  return headers;
 }
 
 export function warmup() {
@@ -78,12 +52,17 @@ export async function api(action, payload = {}) {
   const body = Object.assign({ action, token: _token }, payload);
   let json;
   try {
-    json = await getExec(body);
-    if (!json || isHealthCheck(json)) json = await postExec(body);
+    const res = await fetch(getApiUrl(), {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(body),
+      credentials: 'omit'
+    });
+    json = tryParse(await res.text());
   } catch (e) {
-    throw new ApiError('network', 'Could not reach the backend. Check your connection and the Apps Script URL.');
+    throw new ApiError('network', 'Could not reach the backend. Check your connection and the API URL.');
   }
-  if (!json || isHealthCheck(json)) {
+  if (!json) {
     throw new ApiError('bad_response', 'The backend returned an invalid response.');
   }
   if (json.ok !== true) {

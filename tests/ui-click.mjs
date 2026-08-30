@@ -54,9 +54,9 @@ const go = async (hash) => {
 };
 const click = async (el) => { el.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true })); await tick(120); };
 
-const { installAppsScriptFetch } = await import('./mock-apps-script-fetch.mjs');
-const sandbox = installAppsScriptFetch();
-sandbox.createFirstAdmin('admin', 'Admin@12345', 'System Admin');
+const { installBackendFetch } = await import('./mock-apps-script-fetch.mjs');
+const sandbox = await installBackendFetch();
+await sandbox.direct.createFirstAdmin('admin', 'Admin@12345', 'System Admin');
 
 const apiCall = async (action, payload, token) => {
   const res = await fetch('http://local/exec', {
@@ -85,6 +85,7 @@ if (scenario === 'branch') {
 }
 localStorage.setItem('bo.token', token);
 localStorage.setItem('bo.session', JSON.stringify(loginUser));
+localStorage.setItem('bo.apiUrl', 'http://localhost:8787/api');
 
 await import(new URL('../frontend/assets/js/app.js', import.meta.url).href);
 await tick(100);

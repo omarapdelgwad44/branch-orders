@@ -1,82 +1,64 @@
 /**
- * Local demo backend.
- *
- * Serves the SAME backend/*.gs code (via the Apps Script shim) over HTTP so
- * the frontend can be exercised end-to-end before any Google/GitHub deploy.
- *
- * On start it bootstraps: setupSystem → createFirstAdmin → loadDemoData,
- * all in memory (resets on every restart).
+ * Local demo backend (in-memory copy of the Supabase API).
  *
  * Run:      node tests/serve-local.mjs [port]        (default 8787)
  * Then open:
- *           http://localhost:8080/?api=http://localhost:8787/exec
- *
- * Demo accounts and admin matching README.
+ *           http://localhost:8080/?api=http://localhost:8787/api
  */
 import http from 'node:http';
-import { buildContext, loadBackend } from './appsscript-shim.mjs';
+import { createMemoryStore } from '../supabase/functions/_shared/store-memory.mjs';
+import { createApp, dispatchHttp, jsonHeaders } from '../supabase/functions/_shared/handle.mjs';
 
 const PORT = Number(process.env.PORT || process.argv[2] || 8787);
+const app = createApp(createMemoryStore());
 
-const build = buildContext();
-const { sandbox } = loadBackend(build);
+await app.direct.setupSystem();
+await app.direct.createFirstAdmin('admin', 'Admin@12345', 'System Admin');
+await app.direct.loadDemoData();
 
-sandbox.setupSystem();
-sandbox.createFirstAdmin('admin', 'Admin@12345', 'System Admin');
-sandbox.loadDemoData();
-
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type'
-};
-
-function json(res, status, text) {
-  res.writeHead(status, { ...CORS, 'Content-Type': 'application/json; charset=utf-8' });
-  res.end(text);
+function send(res, status, obj) {
+  res.writeHead(status, jsonHeaders());
+  res.end(JSON.stringify(obj));
 }
 
 const server = http.createServer((req, res) => {
   if (req.method === 'OPTIONS') {
-    res.writeHead(204, CORS);
+    res.writeHead(204, jsonHeaders());
     return res.end();
   }
-  if (req.method === 'GET' && (req.url || '').indexOf('/exec') !== -1) {
-    const i = build.contentOutputs.length;
-    sandbox.doGet(req);
-    return json(res, 200, build.contentOutputs[i].getContent());
+  const url = req.url || '';
+  if (req.method === 'GET') {
+    return dispatchHttp(app, 'GET', url, '').then((out) => send(res, 200, out));
   }
-  if (req.method === 'POST' && (req.url || '').indexOf('/exec') !== -1) {
+  if (req.method === 'POST') {
     let body = '';
     req.on('data', (c) => { body += c; });
-    req.on('end', () => {
-      const i = build.contentOutputs.length;
+    req.on('end', async () => {
       try {
-        sandbox.doPost({ postData: { contents: body } });
-        json(res, 200, build.contentOutputs[i].getContent());
+        send(res, 200, await dispatchHttp(app, 'POST', url, body));
       } catch (e) {
         console.error('backend threw:', e && e.stack ? e.stack : e);
-        json(res, 500, JSON.stringify({ ok: false, error: { code: 'internal_error', message: String((e && e.message) || e) } }));
+        send(res, 500, { ok: false, error: { code: 'internal_error', message: String((e && e.message) || e) } });
       }
     });
     return;
   }
-  json(res, 404, JSON.stringify({ ok: false, error: { code: 'not_found', message: req.method + ' ' + (req.url || '') } }));
+  send(res, 404, { ok: false, error: { code: 'not_found', message: req.method + ' ' + url } });
 });
 
 server.listen(PORT, () => {
   console.log('');
-  console.log('Local Branch Orders backend (in-memory demo of backend/*.gs)');
-  console.log('  API:   http://localhost:' + PORT + '/exec');
+  console.log('Local Branch Orders backend (in-memory Supabase API)');
+  console.log('  API:   http://localhost:' + PORT + '/api');
   console.log('');
-  console.log('  admin       : admin    / Admin@12345');
-  console.log('  admin      : admin.demo / Demo@1234');
-  console.log('  branch user: ali.ahmed / Demo@1234   (Cairo - Nasr City)');
+  console.log('  admin       : admin      / Admin@12345');
+  console.log('  admin       : admin.demo / Demo@1234');
+  console.log('  branch user : ali.ahmed  / Demo@1234   (Cairo - Nasr City)');
   console.log('  branch user : mona.hassan / Demo@1234 (Alexandria)');
   console.log('  branch user : kareem.said / Demo@1234 (Giza)');
   console.log('');
   console.log('Open the frontend with:');
-  console.log('  http://localhost:8080/?api=http://localhost:' + PORT + '/exec');
+  console.log('  http://localhost:8080/?api=http://localhost:' + PORT + '/api');
   console.log('(Ctrl+C to stop. All data resets on restart.)');
   console.log('');
 });

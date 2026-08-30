@@ -4,18 +4,18 @@
 
 Web app (AR/EN · RTL/LTR) لإدارة طلبات المشتريات بين الفروع: الإنشاء، المتابعة، الاستلام، وحفظ النقص.
 
-الواجهة على GitHub Pages، والبيانات على Google Sheets عبر Apps Script:
+الواجهة على GitHub Pages، والبيانات على **Supabase** (Postgres + Edge Function):
 
 ```
 ┌─────────────────────────────┐
 │  GitHub Pages (static)       │
 │  frontend/                   │
-│  HTML/CSS/ES modules         │
 └──────────────┬──────────────┘
-               │  POST /exec
+               │  POST JSON
 ┌──────────────┴──────────────┐
-│  Google Apps Script + Sheets │  ← قاعدة مشتركة لكل الأجهزة
-│  backend/*.gs                │  ← ينشر تلقائياً من GitHub
+│  Supabase Edge Function      │  /functions/v1/api
+│  supabase/functions/         │
+│  Postgres (RLS locked)       │
 └─────────────────────────────┘
 ```
 
@@ -23,174 +23,126 @@ Web app (AR/EN · RTL/LTR) لإدارة طلبات المشتريات بين ا�
 
 | الخطوة | أين |
 |---|---|
-| 1. أنشئ Spreadsheet جديد (احفظه باسم Branch Orders) | sheets.google.com |
-| 2. التمديدات ← Apps Script | من Spreadsheet |
-| 3. اربط المشروع بـ GitHub (مرة واحدة، §1.5) — بعدها أي تعديل على `backend/` ينشر تلقائياً | GitHub Actions + clasp |
-| 4. شغّل `setupSystem()` ثم `createFirstAdmin('admin','YourPass@123','Admin User')` | المحرر (أو القائمة بعد فتح الجدول) |
-| 5. نشر ← Web app (Execute as: Me، Access: Anyone) **مرة واحدة** وانسخ الرابط | Apps Script → Deploy |
-| 6. ضع الرابط في `API_URL` داخل `config.js` ثم ارفع `frontend/` على GitHub Pages | `config.js` + Actions |
+| 1. أنشئ مشروع مجاني على [supabase.com](https://supabase.com) | New project |
+| 2. نفّذ ملف الهجرة في SQL Editor | `supabase/migrations/20260830120000_init.sql` |
+| 3. انشر الـ Edge Function (مرة محلياً أو عبر GitHub Actions) | §1.3 |
+| 4. ضع رابط الدالة ومفتاح `anon` في `frontend/assets/js/config.js` | `API_URL` + `SUPABASE_ANON_KEY` |
+| 5. ارفع `frontend/` على GitHub Pages | Actions → Pages |
+| 6. من شاشة الدخول: أنشئ المسؤول الأول، أو حمّل البيانات التجريبية | الواجهة نفسها |
 
 ## بنية المجلدات
 
 ```
 branch-orders/
-├── backend/              ← باك اند Apps Script (ينشر تلقائياً من GitHub)
-│   ├── Code.gs           HTTP layer + ROUTES (guards: public/auth/admin)
-│   ├── Config.gs         الإعدادات والثوابت + fail()/ApiError/nowIso()
-│   ├── SheetsRepo.gs     مستودع جداول البيانات (صف أول = العناوين) + Ids
-│   ├── AuthService.gs    SHA-256 متكرر 12000 + جلسات + عزل الفروع
-│   ├── ActivityService.gs  سجل أحداث
-│   ├── CatalogService.gs   الفروع/المستخدمون/الأصناف/التوافر
-│   ├── OrderService.gs     دورة حياة الطلب (مسودة→...→استلام/نقص)
-│   ├── AdminService.gs     مقاييس لوحة الإدارة
-│   ├── ReportingService.gs تقارير + تصدير CSV (بدون أسرار)
-│   ├── Setup.gs           setupSystem / createFirstAdmin / loadDemoData
-│   ├── Ui.gs              قوائم Spreadsheet (onOpen)
-│   ├── appsscript.json    Manifest
-│   └── .clasp.json.example
-├── scripts/
-│   ├── deploy-appsscript.mjs          إعادة نشر نفس رابط /exec
-│   └── setup-appsscript-github.mjs    مرة واحدة: أسرار GitHub
-├── frontend/             ← واجهة ثابتة (ES modules، لا build step)
-│   ├── index.html
-│   ├── assets/css/styles.css
-│   ├── assets/js/config.js   ← API_URL لرابط Web App
-│   ├── assets/js/api.js      يستدعي Apps Script (POST text/plain)
-│   └── assets/js/views/      login.js / branch.js / admin.js
-├── tests/                ← اختبارات Node (محاكاة SpreadsheetApp)
-│   ├── appsscript-shim.mjs   محاكاة SpreadsheetApp/LockService/Utilities...
-│   ├── shared-suite.mjs      147 اختباراً مشتركاً بين نسختي الباك اند
-│   ├── run-backend-tests.mjs     تشغيلها على باك اند Apps Script (shim)
-│   ├── serve-local.mjs      خادم تجريبي يحاكي API السحابة
-│   └── check-frontend.mjs    فحص مفاتيح i18n + الأيقونات
-├── .github/workflows/pages.yml              ← نشر تلقائي لـ frontend/ على Pages
-├── .github/workflows/deploy-appsscript.yml  ← نشر تلقائي لـ backend/ على Apps Script
-└── package.json
+├── supabase/
+│   ├── migrations/           جداول Postgres + next_setting_seq
+│   ├── config.toml           verify_jwt = false (جلسات التطبيق)
+│   └── functions/
+│       ├── api/index.ts      HTTP (Deno)
+│       └── _shared/          نفس منطق الـ API (Node + Deno)
+├── frontend/                 واجهة ثابتة
+│   └── assets/js/config.js   ← API_URL + SUPABASE_ANON_KEY
+├── tests/                    اختبارات على نسخة الذاكرة من نفس الـ API
+├── .github/workflows/
+│   ├── pages.yml             نشر الواجهة
+│   └── deploy-supabase.yml   هجرات + Edge Function
+└── backend/                  (قديم — Apps Script، لم يعد مستخدماً)
 ```
 
 ---
 
-## الجزء 1 — الباك اند (Google Apps Script)
+## الجزء 1 — الباك اند (Supabase)
 
-### 1.1 تجهيز الجدول
+### 1.1 إنشاء المشروع
 
-1. افتح [sheets.google.com](https://sheets.google.com) وأنشئ جدولاً جديداً، اسمه مثلاً `Branch Orders`.
-2. من القائمة **Extensions → Apps Script** افتح المحرر (يكفي مشروع فارغ في أول مرة).
-3. ارفع الكود من GitHub (موصى به — [§1.5](#15-النشر-التلقائي-من-github--بدون-لصق-يدوي)) أو الصق الملفات يدوياً مرة واحدة:
-   - كل ملف من `backend/*.gs` كـ script منفصل بنفس الاسم + `appsscript.json` (File → Project settings → "Show appsscript.json").
-4. شغّل `setupSystem()` (تُنشئ كل الأوراق والعناوين؛ إعادة التشغيل آمنة جداً).
+1. افتح [supabase.com/dashboard](https://supabase.com/dashboard) → **New project**.
+2. اختر كلمة سر لقاعدة البيانات واحفظها (ستحتاجها لـ GitHub Actions).
+3. بعد الجاهزية: **Project Settings → API**
+   - `Project URL` مثل `https://abcdefgh.supabase.co`
+   - `anon` `public` key
+   - `Reference ID` (للنشر التلقائي)
 
-### 1.2 أول حساب أدمن
+رابط الدالة بعد النشر:
 
-من المحرر (أو بعد فتح الجدول من القائمة **Branch Orders → Create first admin**):
+`https://<PROJECT_REF>.supabase.co/functions/v1/api`
 
-```javascript
-createFirstAdmin('admin', 'YourPass@123', 'System Admin');
+### 1.2 الجداول
+
+من **SQL Editor → New query** الصق محتوى `supabase/migrations/20260830120000_init.sql` ثم Run.
+
+أو عبر CLI بعد الربط:
+
+```bash
+npx supabase db push
 ```
 
-> لا يمكن إنشاء الأدمن الأول إلا بهذه الشكل. بعده أضف أي مستخدم من لوحة الإدارة.
+الجداول مقفلة بـ RLS بدون سياسات عامة. الواجهة لا تقرأ Postgres مباشرة؛ الـ Edge Function تستخدم `service_role` داخلياً.
 
-### 1.3 بيانات تجريبية (اختياري)
+### 1.3 نشر الـ Edge Function (مرة محلياً)
 
-```javascript
-loadDemoData();
+```bash
+npx supabase login
+npx supabase functions deploy api --project-ref YOUR_REF --no-verify-jwt
 ```
 
-- فروع: `Cairo – Nasr City (BR-001)`، `Alexandria – Sidi Gaber (BR-002)`، `Giza – Dokki (BR-003)`.
-- 12 صنفاً + ربطها بكل الفروع.
-- مستخدمون (كلمة السر للجميع: `Demo@1234`): أدمن `admin.demo` · فروع `ali.ahmed` (BR-001) · `mona.hassan` (BR-002) · `kareem.said` (BR-003).
-- 3 طلبات في حالات مختلفة لإظهار اللوحات.
-- إعادة التشغيل ترفض (`DEMO_LOADED=true`). لإعادة التحميل امسح صف `DEMO_LOADED` من ورقة Settings.
+`verify_jwt` معطّل لأن التطبيق يدير جلساته (`token` في جسم الطلب)، وليس جلسات Supabase Auth.
 
-### 1.4 نشر الـ Web App
+### 1.4 النشر التلقائي من GitHub
 
-1. Apps Script ← **Deploy → New deployment → Web app**.
-2. `Execute as`: خيارك (الموصى به: `Me`؛ والمشروع يعتمد على SpreadsheetApp النشط عند أول تضمين).
-   `Access`: **Anyone** (التحقق من الجهة من داخل الكود عبر الجلسات؛ لا بيانات حساسة عامة).
-3. انسخ رابط الويب الناتج `https://script.google.com/macros/s/XXXX/exec`.
+أسرار الريبو (**Settings → Secrets and variables → Actions**):
 
-> CORS: الـ API يرد بإذن لأي origin (`Access-Control-Allow-Origin: *`) ويرسل الـ POST عبر `Content-Type: text/plain` لتجنّب طلب preflight — وهذا ما يجعله يعمل من أي صفحة GitHub Pages.
-
-### 1.5 النشر التلقائي من GitHub — بدون لصق يدوي
-
-أي دفع على `main` يغيّر `backend/**` يرفع الملفات إلى Apps Script ويعيد نشر **نفس** رابط `/exec` (الواجهة لا تحتاج رابطاً جديداً).
-
-هذا إعداد **مرة واحدة**. بعده المصدر هو GitHub؛ لا تعدّل في محرر Apps Script وإلا الـ Action سيستبدل التعديل.
-
-#### أ) مرة واحدة على Google
-
-1. فعّل [Apps Script API](https://script.google.com/home/usersettings) للحساب الذي يملك المشروع.
-2. من المحرر: **Project Settings** ← انسخ **Script ID**.
-3. أنشئ نشر Web app **مرة واحدة** إن لم يكن موجوداً: **Deploy → New deployment → Web app**  
-   (`Execute as: Me` · `Access: Anyone`) وانسخ الرابط `.../exec`.
-4. **Deployment ID** = الجزء الأوسط من الرابط:
-
-   `https://script.google.com/macros/s/`**`AKfycb...`**`/exec`
-
-#### ب) مرة واحدة على جهازك (Windows)
-
-```powershell
-npx @google/clasp@3.4.0 login
-
-copy backend\.clasp.json.example backend\.clasp.json
-# افتح backend\.clasp.json والصق Script ID مكان PASTE_YOUR_...
-
-node scripts/setup-appsscript-github.mjs AKfycbYOUR_DEPLOYMENT_ID
-```
-
-السكربت يضع ثلاثة GitHub secrets: `CLASPRC_JSON` و `CLASP_JSON` و `APPS_SCRIPT_DEPLOYMENT_ID`.
-
-بدون السكربت، من **Settings → Secrets and variables → Actions**:
-
-| Secret | القيمة |
+| Secret | من أين |
 |---|---|
-| `CLASPRC_JSON` | محتوى `%USERPROFILE%\.clasprc.json` بعد `clasp login` |
-| `CLASP_JSON` | محتوى `backend\.clasp.json` (فيه `scriptId`) |
-| `APPS_SCRIPT_DEPLOYMENT_ID` | `AKfycb...` من رابط `/exec` |
+| `SUPABASE_ACCESS_TOKEN` | [Account → Access Tokens](https://supabase.com/dashboard/account/tokens) |
+| `SUPABASE_PROJECT_REF` | Project Settings → General → Reference ID |
+| `SUPABASE_DB_PASSWORD` | كلمة سر قاعدة البيانات عند إنشاء المشروع |
 
-#### ج) بعدها
+بعدها أي دفع يغيّر `supabase/**` على `main` يطبّق الهجرات وينشر الدالة.
 
-```powershell
-git add backend
-git commit -m "Update Apps Script backend"
-git push origin main
-```
+### 1.5 أول حساب / بيانات تجريبية
 
-راقب **Actions → Deploy Apps Script**. يدوي: **Actions → Deploy Apps Script → Run workflow**.
+من شاشة الدخول (بعد ربط `config.js`):
 
-> `clasp push` يحدّث كود المحرر فقط. إعادة نشر نفس الـ deployment هي ما تجعل رابط `/exec` الحي يخدم الكود الجديد.
+- **إنشاء مسؤول** — أو —
+- **تحميل بيانات تجريبية**
+
+حسابات الديمو (كلمة السر للجميع: `Demo@1234`):
+
+| المستخدم | الدور |
+|---|---|
+| `admin.demo` | أدمن |
+| `ali.ahmed` | فرع القاهرة |
+| `mona.hassan` | فرع الإسكندرية |
+| `kareem.said` | فرع الجيزة |
 
 ---
 
-## الجزء 2 — الواجهة الأمامية (GitHub Pages)
+## الجزء 2 — الواجهة (GitHub Pages)
 
 ### 2.1 الربط بالباك اند
 
-`API_URL` في `frontend/assets/js/config.js` يجب أن يكون رابط Web App (ينتهي بـ `/exec`).
+في `frontend/assets/js/config.js`:
+
+```js
+API_URL: 'https://YOUR_PROJECT.supabase.co/functions/v1/api',
+SUPABASE_ANON_KEY: 'eyJ...'   // anon public — مخصص للمتصفح
+```
+
+مفتاح `anon` عام عمداً. الجداول غير مكشوفة له؛ الدالة تتحقق من الجلسة في كل طلب.
 
 للتطوير المحلي ضد محاكاة الباك اند:
 
 ```bash
-npm run demo:server    # http://localhost:8787/exec
+npm run demo:server    # http://localhost:8787/api
 npm run serve          # http://localhost:8080
-# ثم افتح: http://localhost:8080/?api=http://localhost:8787/exec
+# ثم افتح: http://localhost:8080/?api=http://localhost:8787/api
 ```
 
-### 2.2 تشغيل محلي (مع السحابة الحقيقية)
+### 2.2 النشر على GitHub Pages
 
-```bash
-npm run serve          # http://localhost:8080
-```
-
-الواجهة تستدعي `API_URL` مباشرة. جرب الدخول بعد `setupSystem` / الأدمن الأول، أو الديمو: `admin.demo / Demo@1234` و `ali.ahmed / Demo@1234`.
-
-### 2.3 النشر على GitHub Pages
-
-1. الـ workflow `.github/workflows/pages.yml` ينشر `frontend/` تلقائياً من `main`.
-2. من إعدادات الريبو: **Settings → Pages → Source: GitHub Actions**.
+1. الـ workflow `.github/workflows/pages.yml` ينشر `frontend/` من `main`.
+2. **Settings → Pages → Source: GitHub Actions**.
 3. الرابط: `https://<you>.github.io/branch-orders/`.
-
-> التحديثات على `frontend/**` تعيد نشر الواجهة. التحديثات على `backend/**` تعيد نشر Apps Script (§1.5).
 
 ---
 
@@ -201,50 +153,34 @@ npm run serve          # http://localhost:8080
 | `branch_user` | مسودات الطلبات، الإرسال، الإلغاء للمسودات، متابعة طلبات **فرعه فقط**، الاستلام وتسجيل النقص، تغيير كلمة السر |
 | `admin` | كل الطلبات وكل الفروع، اعتماد/معالجة/شحن/إلغاء، إعادة فتح الاستلام، إدارة الفروع/المستخدمين/الأصناف/التوافر، التقارير وتصدير CSV |
 
-حالة الطلب: `draft → submitted → approved → processing → sent → received` (+ `partially_received` و `shortage_reported` عند النقص، و `cancelled`). كل تحويلة تُتحقق: مثلاً `received → processing` ممنوعة، و `sent → approved` ممنوعة؛ الاستلام الناقص يُعاد فتحه بالأدمن فقط (وإلا كل طلب بأقل من المُرسل يُعرض بنقص).
+حالة الطلب: `draft → submitted → approved → processing → sent → received` (+ `partially_received` و `shortage_reported` عند النقص، و `cancelled`).
 
-### قواعد حماية في الخادم (لا يعتمد على المتصفح)
-- عزل الفروع: كل سؤال يقرأ طلباً أو يعدّله يتحقق من `branch_id` (أو `created_by`) ويرفض الاعتراض.
-- الأدمن يمنع الأدمن الأخير من إلغاء نفسه (`last_active_admin`).
-- كلمات المرور: `sha256$12000$salt$hash` — لا تُخزن أبداً كنص، ولا تظهر في أي رد أو CSV.
-- الجلسات في ورقة `Sessions` (انتهاء تلقائي بـ `SESSION_HOURS`؛ تعطيل/حذف المستخدم يبطلها فوراً).
-- لا مفاتيح سرية في الواجهة؛ الرابط الوحيد هو للـ Web App نفسه.
+### قواعد حماية في الخادم
+- عزل الفروع على كل قراءة/تعديل.
+- لا يمكن تعطيل آخر أدمن نشط (`last_active_admin`).
+- كلمات المرور: `sha256$32$salt$hash` — لا تُرجع في أي رد أو CSV.
+- الجلسات في جدول `sessions` (`SESSION_HOURS`؛ تعطيل المستخدم يبطلها فوراً).
+- الواجهة تحمل فقط رابط الدالة ومفتاح `anon`.
 
----
-
-## الإعدادات (يسط Properties للأدمن، اختياري)
-
-من Apps Script ← **Project Settings → Script properties**:
+### إعدادات اختيارية (جدول `settings`)
 
 | Key | الافتراضي | الوصف |
 |---|---|---|
-| `TIMEZONE` | `Africa/Cairo` | منطقة التوقيت للتوقيعات |
+| `TIMEZONE` | `Africa/Cairo` | منطقة التوقيت |
 | `SESSION_HOURS` | `12` | ساعات انتهاء الجلسة |
-| `ALLOW_DECIMAL_QTY` | `false` | إتاحة كميات عشرية |
-| `REQUIRE_APPROVAL` | `true` | إلزام خطوة الاعتماد (لإبطاله: تمرير `submitted → processing` مباشرة) |
-| `MAX_QTY_PER_ITEM` | `9999` | سقف أمان إضافي للكمية الواحدة |
+| `ALLOW_DECIMAL_QTY` | `false` | كميات عشرية |
+| `REQUIRE_APPROVAL` | `true` | خطوة الاعتماد (يمكن تجاوزها: `submitted → processing`) |
 
 ---
 
 ## الاختبارات
 
 ```bash
-npm test                      # باك اند Apps Script + فحص الواجهة
-npm run syntax                # فحص صياغة ملفات JS الأمامية
+npm test
+npm run syntax
 ```
 
-- `tests/shared-suite.mjs` — 147 اختباراً على باك اند Apps Script (محاكاة SpreadsheetApp في `tests/run-backend-tests.mjs`):
-  - الإعداد الأولي والأدمن الأول والديمو (وتكرارهم تُرفض).
-  - مصادقة: نجاح/فشل/مستخدم مجهول/جلسة منتهية؛ **فحص عدم تسريب كلمات المرور في أي رد**.
-  - دورة الطلب: مسودة → حفظ → إرسال → اعتماد (مع تجاوز الكميات) → معالجة → شحن → استلام كامل/ناقص (reason)، منع إعادة الاستلام، إعادة الفتح.
-  - أخطاء: صنف غير متاح، تجاوز الحد الأقصى، طلب فارغ، صنف مجهول، استلام أكبر من المُرسل، سالب، استلام غير مسموح.
-  - عزل: مستخدم فرع لا يرى/يعدّل/يلغي طلبات غيره، والأدمن يراهم جميعاً مع فلاتر وتصفح.
-  - حماية: إلغاء آخر أدمن ممنوع، تعطيل مستخدم/فرع يمنع الدخول، كلمات مرور ضعيفة مرفوضة، اسم مستخدم/كود فرع مكرر مرفوض.
-  - تقارير/CSV/مقاييس: المجاميع، الفلاتر، **استحقان CSV بلا عمود password**.
-  - التزامنية: 40 مسودة متزامنة تنتج 40 رقم طلب فريد (المعرفات تحت LockService).
-- `tests/check-frontend.mjs` — يفحص أن كل `t('...')` موجود في AR و EN، وكل `icon('...')` موجود في icon set.
-
-> النتائج حالياً: **147/147** على باك اند Apps Script، ومفاتيح الواجهة والأيقونات مكتملة.
+`tests/shared-suite.mjs` يشغّل نفس الـ API على مخزن ذاكرة (بدون شبكة). `demo:server` نفس المنطق عبر HTTP.
 
 ---
 
@@ -252,15 +188,12 @@ npm run syntax                # فحص صياغة ملفات JS الأمامية
 
 | المشكلة | الحل |
 |---|---|
-| "المنصة غير موصولة" | لم تُوضع `API_URL` في `config.js` أو الرابط لا ينتهي بـ `/exec`، أو الـ Web app ليس Access: Anyone |
-| Web App يعيد HTML بدلاً من JSON | انشر **Web app** بالتحديد (ليس API executable). افتح الرابط مرة ثم أعد التحميل |
-| صفحة فارغة بعد الدخول | سجّل الخروج وأعد الدخول؛ تأكد أن `Users` فيها `branch_id` صحيح لمستخدم الفرع |
-| تغييرات الباك اند لا تظهر | تأكد أن Action `Deploy Apps Script` نجح على `main`، وأن سر `APPS_SCRIPT_DEPLOYMENT_ID` هو نفس الجزء الأوسط من رابط `/exec` |
-| أرقام الطلبات بدأت من رقمك الحالي | التعذيذ سجّل Sequencer في `Settings` (`seq.order`). لن تختفي الأرقام من دون مسح هذه الخلايا |
-| بيانات مفقودة | انسخ الجدول (النسخ الاحتياطي) — لا تحذف أوراق تحت التطبيق |
+| "المنصة غير موصولة" | `API_URL` ما زال فيه `YOUR_PROJECT` أو المفتاح `YOUR_ANON_KEY` |
+| 401 من الدالة | انشر بـ `--no-verify-jwt` وتأكد أن `config.toml` فيه `verify_jwt = false` |
+| دالة تعمل والجداول فارغة | نفّذ ملف الهجرة في SQL Editor |
+| صفحة فارغة بعد الدخول | سجّل الخروج وأعد الدخول؛ تأكد أن لمستخدم الفرع `branch_id` صحيح |
+| تغييرات الباك اند لا تظهر | راقب Action `Deploy Supabase` على `main` |
 
 ## النسخ الاحتياطي
 
-الجدول هو قاعدة البيانات: «File → Make a copy» يكفي كنسخة احتياطية.
-
-> ملاحظة: الواجهة تُنشر من `frontend/` عبر Pages؛ الباك اند يُنشر من `backend/` عبر `Deploy Apps Script`.
+من لوحة Supabase: **Database → Backups**، أو تصدير CSV من الجداول.
