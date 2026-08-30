@@ -478,6 +478,7 @@ td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .toast-success .toast-ic { color: #4fe0c2; }
 .toast-error .toast-ic { color: #ff9f97; }
 .toast-info .toast-ic { color: #7ec8e5; }
+.toast-msg { unicode-bidi: isolate; }
 
 /* ============ skeletons & states ============ */
 .skeleton-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; margin-bottom: 16px; }

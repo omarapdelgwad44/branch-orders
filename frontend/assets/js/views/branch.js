@@ -2,7 +2,7 @@
  * Branch user views: dashboard, order history, detail, create/edit order,
  * and the receiving workflow for sent orders.
  */
-import { t, fmtDate, fmtNum } from '../i18n.js';
+import { t, fmtDate, fmtNum, errorText } from '../i18n.js';
 import { api } from '../api.js';
 import { icon } from '../icons.js';
 import { badge, skeletons, qtyControl, attachQty, toast, confirmDialog, openModal, closeModal, numberCell, esc } from '../ui.js';
@@ -73,7 +73,7 @@ async function dashboard(view, ctx) {
     }
     view.innerHTML = html;
   } catch (e) {
-    view.innerHTML = emptyState(e.message || t('msg.error'));
+    view.innerHTML = emptyState(errorText(e));
   }
 }
 
@@ -124,7 +124,7 @@ async function orders(view) {
       document.getElementById('tbody').innerHTML = historyRows(list);
     });
   } catch (e) {
-    view.innerHTML = emptyState(e.message || t('msg.error'));
+    view.innerHTML = emptyState(errorText(e));
   }
 }
 
@@ -144,7 +144,7 @@ async function newOrder(view, ctx) {
   try {
     itemsData = await catalog();
   } catch (e) {
-    view.innerHTML = emptyState(e.message || t('msg.error'));
+    view.innerHTML = emptyState(errorText(e));
     return;
   }
   const categories = [...new Set(itemsData.map(i => i.category).filter(Boolean))];
@@ -184,7 +184,7 @@ async function newOrder(view, ctx) {
       '<select class="input plain" id="catFilter"><option value="">' + esc(t('order.filterCategory')) + '</option>' +
       categories.map(c => '<option value="' + esc(c) + '"' + (cat === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('') +
       '</select></div>' +
-      '<div class="pick-list" id="pickList">' + (rows || '<div class="empty small">' + esc(t('order.empty')) + '</div>') + '</div>' +
+      '<div class="pick-list" id="pickList">' + (rows || '<div class="empty small">' + esc(t('order.noCatalog')) + '</div>') + '</div>' +
       '</div>' +
       '<div class="card order-card">' +
       '<h3>' + esc(t('order.items')) + '</h3><div class="summary" id="summary"></div>' +
@@ -231,19 +231,20 @@ async function newOrder(view, ctx) {
         if (current) await api('orders.save', { order_id: current.order_id, items: payload, notes });
         else await api('orders.create', { items: payload, notes });
         toast(t('msg.saved'), 'success');
-      } catch (e) { toast(e.message || t('msg.error'), 'error'); }
+      } catch (e) { toast(errorText(e), 'error'); }
     }
 
     function buildPayload() {
-      const items = Object.entries(selected)
-        .filter(([, v]) => Number(v) > 0)
-        .map(([id, v]) => ({ item_id: id, quantity: Math.round(Number(v) * 100) / 100 }));
+      const items = {};
+      Object.entries(selected).forEach(([id, v]) => {
+        if (Number(v) > 0) items[id] = Math.round(Number(v) * 100) / 100;
+      });
       return { items, notes };
     }
 
     async function submitOrder(current) {
       if (!Object.keys(selected).some(k => Number(selected[k]) > 0)) {
-        toast(t('order.empty'), 'error');
+        toast(t('err.empty_order'), 'error');
         return;
       }
       const ok = await confirmDialog({
@@ -259,7 +260,7 @@ async function newOrder(view, ctx) {
         await api('orders.submit', { order_id: id });
         toast(t('msg.submitted'), 'success');
         location.hash = '#/orders';
-      } catch (e) { toast(e.message || t('msg.error'), 'error'); }
+      } catch (e) { toast(errorText(e), 'error'); }
     }
   }
   draw();
@@ -334,7 +335,7 @@ async function orderDetail(view, orderId, ctx) {
       document.getElementById('cancelDraft').addEventListener('click', () => cancelDraft(order, ctx.render));
     }
   } catch (e) {
-    view.innerHTML = emptyState(e.message || t('msg.error'));
+    view.innerHTML = emptyState(errorText(e));
   }
 }
 
@@ -347,7 +348,7 @@ async function cancelDraft(order, render) {
     await api('orders.cancel', { order_id: order.order_id, reason });
     toast(t('msg.statusUpdated'), 'success');
     render();
-  } catch (e) { toast(e.message || t('msg.error'), 'error'); }
+  } catch (e) { toast(errorText(e), 'error'); }
 }
 
 function receivingModal(order, render) {
@@ -385,7 +386,7 @@ function receivingModal(order, render) {
       closeModal();
       render();
     } catch (e) {
-      toast(e.message || t('msg.error'), 'error');
+      toast(errorText(e), 'error');
       document.getElementById('recvConfirm').disabled = false;
     }
   });

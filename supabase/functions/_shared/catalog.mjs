@@ -108,13 +108,23 @@ export function createCatalog(store, cfg, ids, activity, auth) {
         updated_at: r.updated_at
       }));
     },
+    async nextFreeBranchId() {
+      for (;;) {
+        const id = await ids.branchId();
+        if (!(await store.find('Branches', 'branch_id', id))) return id;
+      }
+    },
     async create(payload) {
-      const code = String(payload.branch_code || '').trim();
       const name = String(payload.branch_name || '').trim();
-      if (!code || !name) fail('validation', 'Branch code and name are required.');
-      const dup = (await store.all('Branches')).filter((r) => String(r.branch_code).toLowerCase() === code.toLowerCase());
-      if (dup.length) fail('validation', 'This branch code is already in use.');
-      const id = await ids.branchId();
+      if (!name) fail('validation', 'Branch name is required.');
+      const id = await this.nextFreeBranchId();
+      let code = String(payload.branch_code || '').trim() || id;
+      const all = await store.all('Branches');
+      if (all.some((r) => String(r.branch_code).toLowerCase() === code.toLowerCase())) {
+        if (payload.branch_code) fail('validation', 'This branch code is already in use.');
+        do { code = await this.nextFreeBranchId(); }
+        while (all.some((r) => String(r.branch_code).toLowerCase() === code.toLowerCase()));
+      }
       const rec = await store.insert('Branches', {
         branch_id: id,
         branch_code: code,

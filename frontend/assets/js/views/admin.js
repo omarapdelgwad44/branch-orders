@@ -2,7 +2,7 @@
  * Admin views: dashboard metrics, order management/transitions, CRUD for
  * branches/users/items/availability, and reports with CSV export.
  */
-import { t, fmtDate, fmtNum } from '../i18n.js';
+import { t, fmtDate, fmtNum, errorText } from '../i18n.js';
 import { api } from '../api.js';
 import { icon } from '../icons.js';
 import { badge, skeletons, qtyControl, attachQty, toast, confirmDialog, openModal, closeModal, numberCell, esc, fileDownload, debounce, STATUS_TYPES } from '../ui.js';
@@ -96,7 +96,7 @@ async function dashboard(view) {
     const flowWrap = '<div class="card"><div class="card-head"><h3>' + esc(t('dashboard.overview')) + '</h3></div>' + flowHtml + '</div>';
     view.insertAdjacentHTML('beforeend', flowWrap);
   } catch (e) {
-    view.innerHTML = emptyState(e.message || t('msg.error'));
+    view.innerHTML = emptyState(errorText(e));
   }
 }
 
@@ -165,7 +165,7 @@ async function orders(view) {
         '<td><a class="btn btn-ghost btn-sm" href="#/admin/orders/' + esc(o.order_id) + '">' + esc(t('order.view')) + '</a></td></tr>').join('') :
         '<tr><td colspan="7"><div class="empty small">' + esc(t('dashboard.noOrders')) + '</div></td></tr>';
     } catch (e) {
-      tbody.innerHTML = '<tr><td colspan="7"><div class="empty small">' + esc(e.message || t('msg.error')) + '</div></td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7"><div class="empty small">' + esc(errorText(e)) + '</div></td></tr>';
     }
   };
 
@@ -256,7 +256,7 @@ async function orderDetail(view, orderId, ctx) {
       btn.addEventListener('click', () => transition(order, btn.dataset.act, ctx.render));
     });
   } catch (e) {
-    view.innerHTML = emptyState(e.message || t('msg.error'));
+    view.innerHTML = emptyState(errorText(e));
   }
 }
 
@@ -300,7 +300,7 @@ async function transition(order, act, render) {
   if (act === 'reopen') {
     const ok = await confirmDialog({ title: t('admin.reopen'), message: t('admin.reopen.warn'), confirmLabel: t('admin.reopen') });
     if (!ok) return;
-    try { await api('admin.orders.reopen', { order_id: order.order_id }); toast(t('msg.statusUpdated'), 'success'); render(); } catch (e) { toast(e.message || t('msg.error'), 'error'); }
+    try { await api('admin.orders.reopen', { order_id: order.order_id }); toast(t('msg.statusUpdated'), 'success'); render(); } catch (e) { toast(errorText(e), 'error'); }
     return;
   }
   if (act === 'cancelled') {
@@ -309,7 +309,7 @@ async function transition(order, act, render) {
     node.querySelector('[data-cancel]').addEventListener('click', closeModal);
     document.getElementById('doCancel').addEventListener('click', async () => {
       const reason = document.getElementById('cancelReason').value.trim();
-      try { await api('admin.orders.transition', { order_id: order.order_id, to: 'cancelled', reason }); toast(t('msg.statusUpdated'), 'success'); closeModal(); render(); } catch (e) { toast(e.message || t('msg.error'), 'error'); }
+      try { await api('admin.orders.transition', { order_id: order.order_id, to: 'cancelled', reason }); toast(t('msg.statusUpdated'), 'success'); closeModal(); render(); } catch (e) { toast(errorText(e), 'error'); }
     });
     return;
   }
@@ -344,7 +344,7 @@ function qtyTransition(order, act, render) {
       toast(t('msg.statusUpdated'), 'success');
       closeModal();
       render();
-    } catch (e) { toast(e.message || t('msg.error'), 'error'); document.getElementById('doTransition').disabled = false; }
+    } catch (e) { toast(errorText(e), 'error'); document.getElementById('doTransition').disabled = false; }
   });
 }
 
@@ -373,29 +373,33 @@ async function manageBranches(view) {
       node.querySelector('[data-cancel]').addEventListener('click', closeModal);
       document.getElementById('saveBranch').addEventListener('click', async () => {
         const payload = {
-          branch_code: document.getElementById('bc').value.trim(),
           branch_name: document.getElementById('bn').value.trim(),
           location: document.getElementById('bl').value.trim(),
           status: document.getElementById('bs').value
         };
-        if (!payload.branch_code || !payload.branch_name) { toast(t('msg.error'), 'error'); return; }
+        const bc = document.getElementById('bc');
+        if (bc) payload.branch_code = bc.value.trim();
+        if (!payload.branch_name) { toast(t('err.required'), 'error'); return; }
         try {
           if (b) await api('admin.branches.update', { branch_id: b.branch_id, ...payload });
           else await api('admin.branches.create', payload);
           branchesCache = [];
           toast(t('msg.saved'), 'success'); closeModal(); manageBranches(view);
-        } catch (e) { toast(e.message || t('msg.error'), 'error'); }
+        } catch (e) { toast(errorText(e), 'error'); }
       });
     }
     function form(branch) {
       const v = branch || {};
-      return '<label class="field"><span class="field-label">' + esc(t('manage.branchCode')) + '</span><input class="input" id="bc" value="' + esc(v.branch_code || '') + '"></label>' +
+      const codeField = branch
+        ? '<label class="field"><span class="field-label">' + esc(t('manage.branchCode')) + '</span><input class="input" id="bc" value="' + esc(v.branch_code || '') + '"></label>'
+        : '<p class="muted">' + esc(t('manage.branchCodeAuto')) + '</p><input type="hidden" id="bc" value="">';
+      return codeField +
         '<label class="field"><span class="field-label">' + esc(t('manage.branchName')) + '</span><input class="input" id="bn" value="' + esc(v.branch_name || '') + '"></label>' +
         '<label class="field"><span class="field-label">' + esc(t('manage.location')) + '</span><input class="input" id="bl" value="' + esc(v.location || '') + '"></label>' +
         '<label class="field"><span class="field-label">' + esc(t('admin.status')) + '</span><select class="input" id="bs"><option value="active" ' + (v.status !== 'inactive' ? 'selected' : '') + '>' + esc(t('manage.active')) + '</option><option value="inactive" ' + (v.status === 'inactive' ? 'selected' : '') + '>' + esc(t('manage.inactive')) + '</option></select></label>';
     }
   } catch (e) {
-    view.innerHTML = emptyState(e.message || t('msg.error'));
+    view.innerHTML = emptyState(errorText(e));
   }
 }
 
@@ -452,16 +456,16 @@ async function manageUsers(view, ctx) {
         const pw = document.getElementById('upw').value;
         if (pw) payload.new_password = pw;
         if (!u) payload.password = pw;
-        if (!u && !pw) { toast(t('msg.error'), 'error'); return; }
+        if (!u && !pw) { toast(t('err.required'), 'error'); return; }
         try {
           if (u) await api('admin.users.update', { user_id: u.user_id, ...payload });
           else await api('admin.users.create', payload);
           toast(t('msg.saved'), 'success'); closeModal(); manageUsers(view, ctx);
-        } catch (e) { toast(e.message || t('msg.error'), 'error'); }
+        } catch (e) { toast(errorText(e), 'error'); }
       });
     }
   } catch (e) {
-    view.innerHTML = emptyState(e.message || t('msg.error'));
+    view.innerHTML = emptyState(errorText(e));
   }
 }
 
@@ -516,11 +520,11 @@ async function manageItems(view, ctx) {
           if (i) await api('admin.items.update', { item_id: i.item_id, ...payload });
           else await api('admin.items.create', payload);
           toast(t('msg.saved'), 'success'); closeModal(); manageItems(view, ctx);
-        } catch (e) { toast(e.message || t('msg.error'), 'error'); }
+        } catch (e) { toast(errorText(e), 'error'); }
       });
     }
   } catch (e) {
-    view.innerHTML = emptyState(e.message || t('msg.error'));
+    view.innerHTML = emptyState(errorText(e));
   }
 }
 
@@ -545,7 +549,7 @@ async function availability(view) {
           '<td><input class="input plain small-input" type="number" min="0" data-max="' + esc(i.item_id) + '" value="' + esc(maxSafe(i.item_id) || '') + '" placeholder="âˆž"></td></tr>').join('') ||
           '<tr><td colspan="4"><div class="empty small">' + esc(t('reports.noData')) + '</div></td></tr>';
         bindTable();
-      } catch (e) { view.querySelector('#avTable').innerHTML = '<tr><td colspan="4"><div class="empty small">' + esc(e.message) + '</div></td></tr>'; }
+      } catch (e) { view.querySelector('#avTable').innerHTML = '<tr><td colspan="4"><div class="empty small">' + esc(errorText(e)) + '</div></td></tr>'; }
     };
     function availSafe(id) { return assignments[id] ? assignments[id].available !== false : true; }
     function maxSafe(id) { return assignments[id] && assignments[id].max ? assignments[id].max : ''; }
@@ -573,10 +577,10 @@ async function availability(view) {
     document.getElementById('saveAv').addEventListener('click', async () => {
       if (!currentBranch) return;
       const assignmentsArr = activeItems.map(i => ({ item_id: i.item_id, is_available: availSafe(i.item_id), max_quantity: maxSafe(i.item_id) || '' }));
-      try { await api('admin.branchItems.save', { branch_id: currentBranch, assignments: assignmentsArr }); toast(t('msg.saved'), 'success'); } catch (e) { toast(e.message || t('msg.error'), 'error'); }
+      try { await api('admin.branchItems.save', { branch_id: currentBranch, assignments: assignmentsArr }); toast(t('msg.saved'), 'success'); } catch (e) { toast(errorText(e), 'error'); }
     });
   } catch (e) {
-    view.innerHTML = emptyState(e.message || t('msg.error'));
+    view.innerHTML = emptyState(errorText(e));
   }
 }
 
@@ -620,7 +624,7 @@ async function reports(view) {
       const data = await api('reports.' + current, { filters: repFilters });
       document.getElementById('repTitle').querySelector('h3').textContent = t('reports.' + current);
       document.getElementById('repBody').innerHTML = tableFor(current, data.rows);
-    } catch (e) { document.getElementById('repBody').innerHTML = emptyState(e.message || t('msg.error')); }
+    } catch (e) { document.getElementById('repBody').innerHTML = emptyState(errorText(e)); }
   }
 
   document.getElementById('repTabs').addEventListener('click', (e) => {
@@ -636,7 +640,7 @@ async function reports(view) {
     try {
       const res = await api('reports.csv', { kind: current, filters: repFilters });
       fileDownload(res.filename, res.csv, 'text/csv');
-    } catch (e) { toast(e.message || t('msg.error'), 'error'); }
+    } catch (e) { toast(errorText(e), 'error'); }
   });
   document.getElementById('r-apply').addEventListener('click', loadTable);
   document.getElementById('r-reset').addEventListener('click', () => {

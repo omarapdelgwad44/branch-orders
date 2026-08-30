@@ -2,7 +2,7 @@
  * Unified login view. The role is detected on the server; the UI simply
  * follows the authenticated role to the right dashboard.
  */
-import { setLang, getLang, t } from '../i18n.js';
+import { setLang, getLang, t, errorText } from '../i18n.js';
 import { api, warmup } from '../api.js';
 import { icon } from '../icons.js';
 import { isConfigured } from '../config.js';
@@ -100,7 +100,7 @@ function bind(app, onLogin) {
       const session = await api('auth.login', { username, password });
       onLogin(session);
     } catch (err) {
-      showAlert(alertBox, err.message || t('msg.error'), false);
+      showAlert(alertBox, errorText(err), false);
       btn.disabled = false;
       btn.classList.remove('loading');
     }
@@ -112,7 +112,7 @@ async function checkStatus(app) {
   if (!note) return;
   if (!isConfigured()) {
     note.innerHTML = '<span class="note-ic">' + icon('alert', 15) + '</span>' +
-      esc(t('setupError.text'));
+      esc(t('err.setup_error'));
     return;
   }
   try {
@@ -133,12 +133,7 @@ async function checkStatus(app) {
       bindFirstRun(note);
     }
   } catch (err) {
-    if (err.code === 'setup_error') {
-      note.innerHTML = '<span class="note-ic">' + icon('alert', 15) + '</span>' +
-        esc(t('setupError.text'));
-    } else if (err.code === 'network') {
-      note.innerHTML = '<span class="note-ic">' + icon('alert', 15) + '</span>' + esc(err.message);
-    }
+    note.innerHTML = '<span class="note-ic">' + icon('alert', 15) + '</span>' + esc(errorText(err));
   }
 }
 
@@ -177,7 +172,7 @@ function bindFirstRun(note) {
         });
         note.innerHTML = '<span class="note-ic">' + icon('check', 15) + '</span>' + esc(t('firstRun.created'));
       } catch (err) {
-        note.innerHTML = '<span class="note-ic">' + icon('alert', 15) + '</span>' + esc(err.message || t('msg.error'));
+        note.innerHTML = '<span class="note-ic">' + icon('alert', 15) + '</span>' + esc(errorText(err));
       }
     });
   }
@@ -193,7 +188,7 @@ function bindFirstRun(note) {
       } catch (err) {
         demo.disabled = false;
         demo.textContent = t('firstRun.demoBtn');
-        note.innerHTML = '<span class="note-ic">' + icon('alert', 15) + '</span>' + esc(err.message || t('msg.error'));
+        note.innerHTML = '<span class="note-ic">' + icon('alert', 15) + '</span>' + esc(errorText(err));
       }
     });
   }

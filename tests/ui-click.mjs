@@ -91,11 +91,44 @@ await import(new URL('../frontend/assets/js/app.js', import.meta.url).href);
 await tick(100);
 
 if (scenario === 'branch') {
+  const adminTok = (await apiCall('auth.login', { username: 'admin', password: 'Admin@12345' })).data.token;
+  const item = await apiCall('admin.items.create', {
+    item_code: 'WAT-1', item_name: 'Mineral Water', category: 'Beverage', unit: 'bottle'
+  }, adminTok);
+  const itemId = item.data && item.data.item_id;
+  if (!itemId) fail('could not create catalog item for submit test');
+
   await go('#/order/new');
   const v = document.getElementById('view').innerHTML;
   const hasNew = ['itemSearch', 'pickList', 'btnSubmit'].every((id) => !!document.getElementById(id));
   console.log('  new-order form rendered:', !!v && v.length > 200, '| ids present:', hasNew);
   if (!hasNew) fail('new-order page did not render its form');
+
+  const qty = document.querySelector('.qty-val');
+  if (!qty) fail('quantity input missing');
+  else {
+    qty.value = '2';
+    qty.dispatchEvent(new window.Event('input', { bubbles: true }));
+    await tick(40);
+    const summary = document.getElementById('summary');
+    console.log('  after qty: summary has item:', !!(summary && summary.textContent.includes('Mineral Water')));
+    if (!summary || !summary.textContent.includes('Mineral Water')) fail('selected item did not appear in summary');
+
+    await click(document.getElementById('btnSubmit'));
+    const okBtn = document.querySelector('[data-ok]');
+    if (!okBtn) fail('submit confirm dialog did not open');
+    else {
+      await click(okBtn);
+      await tick(400);
+      const toast = document.querySelector('.toast');
+      const toastText = toast ? toast.textContent : '';
+      const hash = String(window.location.hash || '');
+      console.log('  after submit: hash=', hash, '| toast=', toastText.trim());
+      if (hash !== '#/orders' && !/submitted|تم إرسال/i.test(toastText)) {
+        fail('submit with selected items did not succeed: ' + (toastText || hash || 'no toast'));
+      }
+    }
+  }
 } else {
   await go('#/admin/branches');
   const addBranch = document.getElementById('addBranch');
@@ -103,7 +136,7 @@ if (scenario === 'branch') {
   else {
     await click(addBranch);
     const modal = document.getElementById('modal-root');
-    const hasForm = ['bc', 'bn', 'bl', 'bs', 'saveBranch'].every((id) => !!document.getElementById(id));
+    const hasForm = ['bn', 'bl', 'bs', 'saveBranch'].every((id) => !!document.getElementById(id));
     console.log('  click addBranch → modal opens:', modal.querySelector('.modal') !== null, '| form fields:', hasForm);
     if (modal.querySelector('.modal') === null) fail('New Branch click did not open a modal');
     if (!hasForm) fail('branch form fields not all present');

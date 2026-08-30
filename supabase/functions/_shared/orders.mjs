@@ -22,6 +22,21 @@ export function createOrders(store, cfg, ids, activity, Items) {
     return Math.round(n);
   }
 
+  function qtyMap(requested) {
+    if (!requested) return {};
+    if (Array.isArray(requested)) {
+      const map = {};
+      requested.forEach((row) => {
+        if (!row || typeof row !== 'object') return;
+        const id = row.item_id || row.itemId;
+        if (!id) return;
+        map[String(id)] = row.quantity ?? row.requested_quantity ?? row.qty;
+      });
+      return map;
+    }
+    return typeof requested === 'object' ? requested : {};
+  }
+
   async function checkBranchState(branchId) {
     const b = await store.find('Branches', 'branch_id', branchId);
     if (!b) fail('validation', 'Branch not found.');
@@ -102,9 +117,10 @@ export function createOrders(store, cfg, ids, activity, Items) {
         }
       });
     }
+    const qtyByItem = qtyMap(requested);
     const clean = [];
-    for (const itemId of Object.keys(requested || {})) {
-      const q = validateQty(requested[itemId], allowDecimalQty);
+    for (const itemId of Object.keys(qtyByItem)) {
+      const q = validateQty(qtyByItem[itemId], allowDecimalQty);
       if (q === null || q <= 0) continue;
       const m = itm[itemId];
       if (!m) fail('validation', 'Unknown item: ' + itemId);

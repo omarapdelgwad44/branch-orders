@@ -155,6 +155,12 @@ export async function runSharedSuite(host) {
   eq(capErr.code, 'validation', 'draft above max quantity rejected');
   const capOk = await apiOk('orders.create', { notes: 'cap ok', items: { 'ITM-1': 5, 'ITM-2': 10 } }, ALI_T);
   eq(capOk.status, 'draft', 'draft within cap accepted');
+  const fromArr = await apiOk('orders.create', {
+    notes: 'from array',
+    items: [{ item_id: 'ITM-2', quantity: 3 }, { item_id: 'ITM-3', quantity: 1 }]
+  }, ALI_T);
+  eq(fromArr.items.filter((i) => i.requested_quantity > 0).length, 2, 'array items payload is accepted');
+  eq(fromArr.total_requested, 4, 'array items quantities persisted');
   await apiOk('admin.branchItems.save', { branch_id: 'BR-001', assignments: [{ item_id: 'ITM-1', is_available: true, max_quantity: '' }] }, ADMIN_T);
 
   // unknown item id
