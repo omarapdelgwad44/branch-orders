@@ -61,7 +61,7 @@ function layout() {
           '<button class="btn btn-primary btn-block btn-lg" type="submit">' +
             t('login.submit') + '</button>' +
         '</form>' +
-        '<div class="login-note" id="loginNote"></div>' +
+        '<div class="login-note hidden" id="loginNote"></div>' +
       '</div>' +
     '</main>' +
     '</div>'
@@ -114,9 +114,18 @@ function bind(app, onLogin) {
 async function checkStatus(app) {
   const note = document.getElementById('loginNote');
   if (!note) return;
+  const showNote = (html) => {
+    if (html) {
+      note.innerHTML = html;
+      note.classList.remove('hidden');
+    } else {
+      note.innerHTML = '';
+      note.classList.add('hidden');
+    }
+  };
   if (!isConfigured()) {
-    note.innerHTML = '<span class="note-ic">' + icon('alert', 15) + '</span>' +
-      esc(t('err.setup_error'));
+    showNote('<span class="note-ic">' + icon('alert', 15) + '</span>' +
+      esc(t('err.setup_error')));
     return;
   }
   try {
@@ -133,11 +142,11 @@ async function checkStatus(app) {
       try { sessionStorage.setItem('bo.sysStatus', JSON.stringify({ at: Date.now(), data: status })); } catch (e) { /* ignore */ }
     }
     if (status.needsSetup) {
-      note.innerHTML = firstRunCard();
+      showNote(firstRunCard());
       bindFirstRun(note);
     }
   } catch (err) {
-    note.innerHTML = '<span class="note-ic">' + icon('alert', 15) + '</span>' + esc(errorText(err));
+    showNote('<span class="note-ic">' + icon('alert', 15) + '</span>' + esc(errorText(err)));
   }
 }
 
