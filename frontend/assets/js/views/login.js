@@ -5,7 +5,7 @@
 import { setLang, getLang, t, errorText } from '../i18n.js';
 import { api, warmup } from '../api.js';
 import { icon } from '../icons.js';
-import { isConfigured } from '../config.js';
+import { isConfigured, CONFIG } from '../config.js';
 
 export function render(app, { onLogin }) {
   warmup();
@@ -18,6 +18,9 @@ export function render(app, { onLogin }) {
 function layout() {
   const langBtn = '<button class="lang-pill" id="langSwitch" type="button">' +
     '<span class="lang-dot"></span>' + t('lang.toggle') + '</button>';
+  const hints = (CONFIG.LOGIN_HINTS || [])
+    .map((u) => '<option value="' + esc(u) + '"></option>')
+    .join('');
   return (
     '<div class="login">' +
     '<aside class="login-hero">' +
@@ -48,7 +51,8 @@ function layout() {
         '<form id="loginForm" novalidate>' +
           '<label class="field">' +
             '<span class="field-label">' + esc(t('login.username')) + '</span>' +
-            '<input class="input" type="text" name="username" autocomplete="username" required autofocus>' +
+            '<input class="input" type="text" name="username" autocomplete="username" list="loginHints" required autofocus>' +
+            '<datalist id="loginHints">' + (hints || '<option></option>') + '</datalist>' +
           '</label>' +
           '<label class="field">' +
             '<span class="field-label">' + esc(t('login.password')) + '</span>' +

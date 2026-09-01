@@ -7,6 +7,8 @@ export const CONFIG = {
   SUPABASE_ANON_KEY: 'sb_publishable_Msm3zgV5qodg-myIKBEE_A_jdxAO-SO',
   APP_NAME: 'Branch Orders',
   APP_TAGLINE: 'Internal ordering system',
+  LOGIN_HINTS: ['admin', 'embaba', 'toukh', 'masrrad', 'helwelsham', 'zakah',
+    'bravocairo', 'bravoalexandria', 'kafrelsheikh', 'bahira'],
   STORAGE_KEYS: {
     token: 'bo.token',
     session: 'bo.session',
