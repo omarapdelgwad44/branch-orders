@@ -6,6 +6,7 @@ import { t, fmtDate, fmtNum, errorText } from '../i18n.js';
 import { api } from '../api.js';
 import { icon } from '../icons.js';
 import { badge, skeletons, qtyControl, attachQty, toast, confirmDialog, openModal, closeModal, numberCell, esc, debounce } from '../ui.js';
+import { canPrintReport, reportButtonsHtml, bindReportButtons } from '../report.js';
 
 const catalogCache = { at: 0, items: [] };
 
@@ -316,6 +317,7 @@ async function orderDetail(view, orderId, ctx) {
     const rows = order.items.map(it =>
       '<tr><td><b>' + esc(it.item_name) + '</b><div class="sub">' + esc(it.item_code || '') + '</div></td>' +
       '<td class="center">' + numberCell(it.requested_quantity, it.unit) + '</td>' +
+      '<td class="center">' + numberCell(it.approved_quantity, it.unit) + '</td>' +
       '<td class="center">' + numberCell(it.sent_quantity, it.unit) + '</td>' +
       '<td class="center">' + numberCell(it.received_quantity, it.unit) + '</td>' +
       '<td class="center">' + (it.shortage_quantity !== null ? numberCell(it.shortage_quantity, it.unit) : t('common.none')) + '</td>' +
@@ -336,6 +338,7 @@ async function orderDetail(view, orderId, ctx) {
       '<div class="table-wrap"><table class="tbl"><thead><tr>' +
       '<th>' + esc(t('manage.itemName')) + '</th>' +
       '<th class="center">' + esc(t('order.requested')) + '</th>' +
+      '<th class="center">' + esc(t('order.approved')) + '</th>' +
       '<th class="center">' + esc(t('order.sent')) + '</th>' +
       '<th class="center">' + esc(t('order.received')) + '</th>' +
       '<th class="center">' + esc(t('order.shortage')) + '</th>' +
@@ -355,8 +358,11 @@ async function orderDetail(view, orderId, ctx) {
     }
 
     view.innerHTML =
-      '<div class="page-head"><a class="btn btn-ghost" href="#/orders">' + icon('chevL', 16, 'flip-rtl') + ' ' + esc(t('common.back')) + '</a></div>' +
+      '<div class="page-head"><div><a class="btn btn-ghost" href="#/orders">' + icon('chevL', 16, 'flip-rtl') + ' ' + esc(t('common.back')) + '</a></div>' +
+      '<div class="form-actions">' + (canPrintReport(u, order) ? reportButtonsHtml() : '') + '</div></div>' +
       '<div class="detail-grid">' + meta + breakdown + '</div>' + actions;
+
+    if (canPrintReport(u, order)) bindReportButtons(order, { forAdmin: false });
 
     if (document.getElementById('btnReceive')) {
       document.getElementById('btnReceive').addEventListener('click', () => receivingModal(order, ctx.render));
@@ -383,13 +389,17 @@ async function cancelDraft(order, render) {
 
 function receivingModal(order, render) {
   const body = '<p class="modal-msg">' + esc(t('receiving.perItemNote')) + '</p>' +
-    '<div class="recv-list">' + order.items.map(it =>
-      '<div class="recv-item" data-id="' + esc(it.item_id) + '">' +
+    '<div class="recv-list">' + order.items.map(it => {
+      const sent = Number(it.sent_quantity) || 0;
+      return '<div class="recv-item" data-id="' + esc(it.item_id) + '" data-sent="' + sent + '">' +
       '<div class="recv-info"><b>' + esc(it.item_name) + '</b>' +
-      '<em>' + esc(t('order.sent')) + ': ' + fmtNum(it.sent_quantity || 0) + ' ' + esc(it.unit) + '</em></div>' +
-      '<div data-stepper>' + qtyControl(it.sent_quantity || 0, (it.sent_quantity || 0)) + '</div>' +
-      '<input class="input plain small-input" data-reason type="text" placeholder="' + esc(t('order.shortageReason')) + '">' +
-      '</div>').join('') + '</div>';
+      '<em>' + esc(t('order.sent')) + ': ' + fmtNum(sent) + ' ' + esc(it.unit) + '</em>' +
+      '<div class="recv-short" data-short><span>' + esc(t('receiving.shortage')) + ':</span> <b>' + fmtNum(0) + '</b></div></div>' +
+      '<div><div data-stepper>' + qtyControl(sent, null) + '</div>' +
+      '<label class="recv-full"><input type="checkbox" data-full checked> ' + esc(t('receiving.full')) + '</label>' +
+      '<div class="recv-reason hidden" data-reasonwrap><input class="input plain small-input" data-reason type="text" placeholder="' + esc(t('order.shortageReason')) + '"></div>' +
+      '</div></div>';
+    }).join('') + '</div>';
 
   const node = openModal({ title: t('receiving.title'), body, footer: '' });
   node.querySelector('.modal-foot').innerHTML =
@@ -398,17 +408,64 @@ function receivingModal(order, render) {
   attachQty(node);
   node.querySelector('[data-cancel]').addEventListener('click', closeModal);
 
+  const readReceived = (row) => {
+    const sent = Number(row.dataset.sent) || 0;
+    const raw = row.querySelector('.qty-val').value;
+    if (raw === '' || raw === null || raw === undefined) return sent;
+    const val = parseFloat(raw);
+    return isNaN(val) ? sent : val;
+  };
+
+  const refreshRow = (row) => {
+    const sent = Number(row.dataset.sent) || 0;
+    const received = readReceived(row);
+    const shortage = Math.max(0, sent - received);
+    const badge = row.querySelector('[data-short]');
+    if (badge) {
+      badge.querySelector('b').textContent = fmtNum(shortage);
+      badge.classList.toggle('has-short', shortage > 0);
+    }
+    const wrap = row.querySelector('[data-reasonwrap]');
+    if (wrap) wrap.classList.toggle('hidden', shortage <= 0);
+    const full = row.querySelector('[data-full]');
+    if (full) full.checked = (received === sent);
+  };
+
+  node.querySelectorAll('.recv-item').forEach((row) => {
+    const input = row.querySelector('.qty-val');
+    const full = row.querySelector('[data-full]');
+    if (input) input.addEventListener('input', () => refreshRow(row));
+    if (full) full.addEventListener('change', () => {
+      if (full.checked) {
+        row.querySelector('.qty-val').value = row.dataset.sent;
+        row.querySelector('.qty-val').dispatchEvent(new Event('input', { bubbles: true }));
+      } else {
+        row.querySelector('.qty-val').focus();
+      }
+      refreshRow(row);
+    });
+    refreshRow(row);
+  });
+
   document.getElementById('recvConfirm').addEventListener('click', async () => {
     const quantities = {};
     const reasons = {};
+    let blocked = false;
     node.querySelectorAll('.recv-item').forEach(r => {
       const id = r.dataset.id;
-      const sent = parseFloat(r.querySelector('.recv-info em').textContent.replace(/[^0-9.-]/g, ''));
-      const val = parseFloat(r.querySelector('.qty-val').value);
-      quantities[id] = (!isNaN(val) && val !== sent) ? val : sent;
+      const sent = Number(r.dataset.sent) || 0;
+      const received = readReceived(r);
+      // The received input stays authoritative; the checkbox only presets it.
+      if (received > sent) blocked = true;
+      quantities[id] = received;
+      const shortage = Math.max(0, sent - received);
       const reason = r.querySelector('[data-reason]').value.trim();
-      if (reason) reasons[id] = reason;
+      if (shortage > 0 && reason) reasons[id] = reason;
     });
+    if (blocked) {
+      toast(t('receiving.exceeds'), 'error');
+      return;
+    }
     document.getElementById('recvConfirm').disabled = true;
     try {
       await api('orders.receive', { order_id: order.order_id, quantities, reasons });

@@ -97,7 +97,7 @@ function renderShell(user) {
           '<span class="side-user-meta"><b>' + escNav(user.full_name || user.username) + '</b>' +
           '<em>' + (user.role === 'admin' ? escNav(t('manage.roleAdmin')) : escNav(user.branch && user.branch.branch_name || '')) + '</em></span>' +
         '</div>' +
-        '<button class="side-link" id="btn-lang">' + icon('copy', 15) + ' ' + escNav(t('lang.toggle')) + '</button>' +
+        '<button class="side-link" id="btn-lang" aria-label="' + escNav(t('a11y.switchLanguage')) + '">' + icon('globe', 15) + ' ' + escNav(t('lang.toggle')) + '</button>' +
         '<button class="side-link danger" id="btn-logout">' + icon('logout', 15) + ' ' + escNav(t('nav.logout')) + '</button>' +
       '</div>' +
     '</aside>' +
@@ -106,7 +106,7 @@ function renderShell(user) {
         '<button class="icon-btn menu-btn" id="btn-menu" aria-label="' + escNav(t('a11y.menu')) + '" aria-controls="sidebar" aria-expanded="false">' + icon('menu', 20) + '</button>' +
         '<span class="topbar-title" id="topbar-title"></span>' +
         '<div class="topbar-right">' +
-          '<button class="icon-btn" id="btn-lang2" aria-label="' + escNav(t('a11y.language')) + '">' + icon('copy', 18) + '</button>' +
+          '<button class="icon-btn topbar-lang" id="btn-lang2" aria-label="' + escNav(t('a11y.switchLanguage')) + '">' + icon('globe', 18) + '<span>' + escNav(t('lang.toggle')) + '</span></button>' +
           '<button class="icon-btn" id="btn-logout2" aria-label="' + escNav(t('a11y.logout')) + '">' + icon('logout', 18) + '</button>' +
         '</div>' +
       '</header>' +

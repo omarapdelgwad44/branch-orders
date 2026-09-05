@@ -6,6 +6,7 @@ import { t, fmtDate, fmtNum, errorText } from '../i18n.js';
 import { api } from '../api.js';
 import { icon } from '../icons.js';
 import { badge, skeletons, qtyControl, attachQty, toast, confirmDialog, openModal, closeModal, numberCell, esc, fileDownload, debounce, STATUS_TYPES } from '../ui.js';
+import { reportButtonsHtml, bindReportButtons } from '../report.js';
 
 let branchesCache = [];
 async function branches() {
@@ -245,12 +246,13 @@ async function orderDetail(view, orderId, ctx) {
       '<button class="btn ' + a.cls + '" data-act="' + a.act + '">' + icon(a.ic, 15) + ' ' + esc(a.label) + '</button>').join('') + '</div>' : '';
 
     view.innerHTML =
-      '<div class="page-head"><div><a class="btn btn-ghost" href="#/admin/orders">' + icon('chevL', 16, 'flip-rtl') + ' ' + esc(t('common.back')) + '</a>' +
-      '<button class="btn btn-ghost" id="printBtn">' + icon('file', 15) + ' ' + esc(t('common.print')) + '</button></div></div>' +
+      '<div class="page-head"><div><a class="btn btn-ghost" href="#/admin/orders">' + icon('chevL', 16, 'flip-rtl') + ' ' + esc(t('common.back')) + '</a></div>' +
+      '<div class="form-actions"><button class="btn btn-ghost" id="printBtn">' + icon('file', 15) + ' ' + esc(t('common.print')) + '</button>' + reportButtonsHtml() + '</div></div>' +
       '<div class="detail-grid">' + meta + itemsCard + '</div>' + notesCard +
       '<div class="detail-grid">' + timeline(order) + actionCards(order) + '</div>' + actionRow;
 
     if (document.getElementById('printBtn')) document.getElementById('printBtn').addEventListener('click', () => window.print());
+    bindReportButtons(order, { forAdmin: true });
 
     view.querySelectorAll('[data-act]').forEach(btn => {
       btn.addEventListener('click', () => transition(order, btn.dataset.act, ctx.render));
@@ -317,7 +319,11 @@ async function transition(order, act, render) {
 }
 
 function qtyTransition(order, act, render) {
-  const col = act === 'approved' ? 'approved_quantity' : act === 'sent' ? 'sent_quantity' : null;
+  // Payload keys must match the backend contract in orders.mjs adminTransition:
+  // approved_qty is applied on submitted→approved and on the submitted→processing bypass.
+  const qtyKey = act === 'approved' ? 'approved_qty'
+    : act === 'sent' ? 'sent_qty'
+    : (act === 'processing' && order.status === 'submitted') ? 'approved_qty' : null;
   const prefill = act === 'sent' ? (it => it.approved_quantity !== null ? it.approved_quantity : it.requested_quantity)
     : (it => it.requested_quantity);
   const body = '<p class="modal-msg">' + (act === 'sent' ? esc(t('admin.transition.warn.sent')) : esc(t('admin.transition.warn.approve'))) + '</p>' +
@@ -334,10 +340,11 @@ function qtyTransition(order, act, render) {
     const byItem = {};
     node.querySelectorAll('.recv-item').forEach(r => {
       const val = parseFloat(r.querySelector('.qty-val').value);
-      byItem[r.dataset.id] = !isNaN(val) ? val : prefill(order.items.filter(i => i.item_id === r.dataset.id)[0]);
+      const fallback = prefill((order.items.filter(i => i.item_id === r.dataset.id)[0]) || { requested_quantity: 0 });
+      byItem[r.dataset.id] = !isNaN(val) ? val : fallback;
     });
     const payload = { order_id: order.order_id, to: act, notes: (document.getElementById('qtyNotes').value || '') };
-    payload[act === 'approved' ? 'approved_qty' : 'sent_qty'] = byItem;
+    if (qtyKey) payload[qtyKey] = byItem;
     document.getElementById('doTransition').disabled = true;
     try {
       await api('admin.orders.transition', payload);

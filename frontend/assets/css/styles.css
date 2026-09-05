@@ -670,7 +670,55 @@ td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
   .pager .btn { min-height: 40px; min-width: 44px; }
 }
 
+/* ============ topbar language ============ */
+.topbar-lang { display: inline-flex; width: auto; gap: 6px; font-size: .84rem; font-weight: 700; }
+.topbar-lang span { white-space: nowrap; }
+@media (min-width: 1101px) {
+  /* Sidebar text button covers language on desktop; avoid a duplicate control. */
+  #btn-lang2 { display: none; }
+}
+
+/* ============ new-order rows: direction-aware (logical, no physical L/R) ============ */
+.pick-row { flex-direction: row; }
+.pick-row > [data-stepper] { margin-inline-start: auto; }
+
+/* ============ receiving ============ */
+.recv-short { display: flex; align-items: center; gap: 6px; font-size: .8rem; color: var(--muted); margin-top: 6px; }
+.recv-short b { font-variant-numeric: tabular-nums; }
+.recv-short.has-short { color: var(--red); font-weight: 700; }
+.recv-reason { margin-top: 6px; }
+.recv-reason.hidden { display: none; }
+.recv-full { display: flex; align-items: center; gap: 8px; font-size: .84rem; font-weight: 600; color: var(--muted); margin-top: 8px; cursor: pointer; }
+.recv-full input { width: 18px; height: 18px; accent-color: var(--primary); }
+
+/* ============ printable order report ============ */
+#report-root { display: none; }
+.report { display: grid; gap: 16px; color: var(--ink); }
+.rep-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.rep-app { font-size: .8rem; color: var(--muted); font-weight: 600; }
+.rep-head h2 { font-size: 1.25rem; margin-top: 2px; }
+.rep-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; }
+.rep-meta { display: grid; gap: 2px; }
+.rep-meta span { font-size: .72rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .3px; }
+.rep-meta b { font-size: .92rem; overflow-wrap: anywhere; }
+.rep-tbl { width: 100%; border-collapse: collapse; font-size: .86rem; }
+.rep-tbl th { text-align: start; font-size: .72rem; text-transform: uppercase; letter-spacing: .3px; color: var(--muted); padding: 8px; border-bottom: 2px solid var(--ink); white-space: nowrap; }
+.rep-tbl td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.rep-sub { font-size: .74rem; color: var(--muted); }
+.rep-total td { border-top: 2px solid var(--ink); border-bottom: 0; }
+.rep-note { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-top: 10px; }
+.rep-note b { font-size: .76rem; color: var(--muted); text-transform: uppercase; letter-spacing: .3px; }
+.rep-note p { margin: 6px 0 0; font-size: .9rem; }
+.rep-signs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; margin-top: 26px; }
+.rep-sign { border-top: 1px solid var(--ink); padding-top: 6px; font-size: .8rem; color: var(--muted); text-align: center; min-height: 64px; }
+
 @media print {
+  #app, #modal-root, #toast-root { display: none !important; }
+  #report-root { display: block !important; }
+  .report { gap: 12px; color: #000; }
+  .rep-grid { grid-template-columns: 1fr 1fr; }
+  .rep-tbl { font-size: 11px; }
+  .rep-signs { break-inside: avoid; }
   .sidebar, .topbar, .form-actions, .toast, #toast-root, .btn, .pager, .filters-card,
   .backdrop, #modal-root, .menu-btn { display: none !important; }
   .main { margin: 0; }

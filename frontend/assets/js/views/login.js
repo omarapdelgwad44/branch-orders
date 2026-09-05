@@ -16,8 +16,8 @@ export function render(app, { onLogin }) {
 }
 
 function layout() {
-  const langBtn = '<button class="lang-pill" id="langSwitch" type="button">' +
-    '<span class="lang-dot"></span>' + t('lang.toggle') + '</button>';
+  const langBtn = '<button class="lang-pill" id="langSwitch" type="button" aria-label="' + esc(t('a11y.switchLanguage')) + '">' +
+    icon('globe', 15) + '<span>' + esc(t('lang.toggle')) + '</span></button>';
   const hints = (CONFIG.LOGIN_HINTS || [])
     .map((u) => '<option value="' + esc(u) + '"></option>')
     .join('');

@@ -30,7 +30,7 @@ const fail = (msg) => { failed++; console.log('  FAIL ' + msg); };
 
 // collect all t('...') and icon('...') literal keys
 const files = readdirSync(viewsDir).filter(f => f.endsWith('.js'))
-  .concat(['app.js', 'ui.js'].filter(f => readdirSync(srcDir).includes(f)))
+  .concat(['app.js', 'ui.js', 'report.js'].filter(f => readdirSync(srcDir).includes(f)))
   .map(f => readdirSync(viewsDir).includes(f) ? join(viewsDir, f) : join(srcDir, f));
 
 const staticKeys = new Set();
