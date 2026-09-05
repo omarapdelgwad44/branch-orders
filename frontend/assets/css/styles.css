@@ -701,8 +701,10 @@ tr.av-off .badge.av-tag { display: inline-flex; }
 
 /* ============ receiving ============ */
 .recv-short { display: flex; align-items: center; gap: 6px; font-size: .8rem; color: var(--muted); margin-top: 6px; }
+.recv-short.hidden { display: none; }
 .recv-short b { font-variant-numeric: tabular-nums; }
 .recv-short.has-short { color: var(--red); font-weight: 700; }
+.recv-short.has-excess { color: var(--amber); font-weight: 700; }
 .recv-reason { margin-top: 6px; }
 .recv-reason.hidden { display: none; }
 .recv-full { display: flex; align-items: center; gap: 8px; font-size: .84rem; font-weight: 600; color: var(--muted); margin-top: 8px; cursor: pointer; }

@@ -24,15 +24,16 @@ export function canPrintReport(user, order) {
 }
 
 function totals(order) {
-  let req = 0, appr = 0, sent = 0, recv = 0, short = 0;
+  let req = 0, appr = 0, sent = 0, recv = 0, short = 0, exc = 0;
   (order.items || []).forEach((it) => {
     req += Number(it.requested_quantity) || 0;
     appr += Number(it.approved_quantity) || 0;
     sent += Number(it.sent_quantity) || 0;
     recv += Number(it.received_quantity) || 0;
     short += Number(it.shortage_quantity) || 0;
+    exc += Math.max(0, (Number(it.received_quantity) || 0) - (Number(it.sent_quantity) || 0));
   });
-  return { req, appr, sent, recv, short };
+  return { req, appr, sent, recv, short, exc };
 }
 
 function metaRow(label, value) {
@@ -72,22 +73,26 @@ export function buildReportHtml(order, opts) {
     '<th>' + esc(t('order.sent')) + '</th>' +
     '<th>' + esc(t('order.received')) + '</th>' +
     '<th>' + esc(t('order.shortage')) + '</th>' +
+    '<th>' + esc(t('order.excess')) + '</th>' +
     '<th>' + esc(t('order.shortageReason')) + '</th>' +
     '</tr></thead><tbody>' +
-    (order.items || []).map((it) =>
-      '<tr><td><b>' + esc(it.item_name) + '</b>' +
+    (order.items || []).map((it) => {
+      const excess = Math.max(0, (Number(it.received_quantity) || 0) - (Number(it.sent_quantity) || 0));
+      return '<tr><td><b>' + esc(it.item_name) + '</b>' +
       (it.item_code ? '<div class="rep-sub">' + esc(it.item_code) + '</div>' : '') + '</td>' +
       '<td>' + fmtNum(it.requested_quantity) + '</td>' +
       '<td>' + (it.approved_quantity === null || it.approved_quantity === undefined || it.approved_quantity === '' ? esc(t('common.none')) : fmtNum(it.approved_quantity)) + '</td>' +
       '<td>' + (it.sent_quantity === null || it.sent_quantity === undefined || it.sent_quantity === '' ? esc(t('common.none')) : fmtNum(it.sent_quantity)) + '</td>' +
       '<td>' + (it.received_quantity === null || it.received_quantity === undefined || it.received_quantity === '' ? esc(t('common.none')) : fmtNum(it.received_quantity)) + '</td>' +
-      '<td>' + (it.shortage_quantity === null || it.shortage_quantity === undefined || it.shortage_quantity === '' ? esc(t('common.none')) : fmtNum(it.shortage_quantity)) + '</td>' +
-      '<td>' + esc(it.shortage_reason || '') + '</td></tr>'
-    ).join('') +
+      '<td>' + (it.shortage_quantity > 0 ? fmtNum(it.shortage_quantity) : esc(t('common.none'))) + '</td>' +
+      '<td>' + (excess > 0 ? '+' + fmtNum(excess) : esc(t('common.none'))) + '</td>' +
+      '<td>' + esc(it.shortage_reason || '') + '</td></tr>';
+    }).join('') +
     '<tr class="rep-total"><td><b>' + esc(t('report.totals')) + '</b></td>' +
     '<td><b>' + fmtNum(tt.req) + '</b></td><td><b>' + fmtNum(tt.appr) + '</b></td>' +
     '<td><b>' + fmtNum(tt.sent) + '</b></td><td><b>' + fmtNum(tt.recv) + '</b></td>' +
-    '<td><b>' + fmtNum(tt.short) + '</b></td><td></td></tr>' +
+    '<td><b>' + (tt.short > 0 ? fmtNum(tt.short) : esc(t('common.none'))) + '</b></td>' +
+    '<td><b>' + (tt.exc > 0 ? '+' + fmtNum(tt.exc) : esc(t('common.none'))) + '</b></td><td></td></tr>' +
     '</tbody></table></div>';
 
   let notes = '';

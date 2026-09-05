@@ -388,6 +388,16 @@ if (scenario === 'admin') {
     ok(mrow.querySelector('[data-short] b').textContent.includes('6'), 'shortage shows 6, got ' + mrow.querySelector('[data-short] b').textContent);
     ok(!mrow.querySelector('[data-reasonwrap]').classList.contains('hidden'), 'reason shown when shortage');
     ok(!mrow.querySelector('[data-full]').checked, 'full unchecked after partial qty');
+    input.value = '10';
+    input.dispatchEvent(new window.Event('input', { bubbles: true }));
+    await tick(60);
+    ok(mrow.querySelector('[data-short]').classList.contains('hidden'), 'no indicator when received equals sent');
+    input.value = '12';
+    input.dispatchEvent(new window.Event('input', { bubbles: true }));
+    await tick(60);
+    const exLine = mrow.querySelector('[data-short]');
+    ok(!exLine.classList.contains('hidden') && exLine.classList.contains('has-excess'), 'excess indicator appears');
+    ok(exLine.querySelector('[data-sval]').textContent.includes('+2'), 'excess shows +2, got ' + exLine.querySelector('[data-sval]').textContent);
     input.value = '99';
     input.dispatchEvent(new window.Event('input', { bubbles: true }));
     await tick(40);
@@ -412,6 +422,8 @@ if (scenario === 'admin') {
   ok((window.__printed || 0) >= 1, 'branch print triggers print flow');
   const repHtml = document.getElementById('report-root').innerHTML;
   ok(repHtml.includes('Mineral Water'), 'branch report lists items');
+  ok(repHtml.includes('Excess'), 'branch report has excess column');
+  ok(document.getElementById('view').textContent.includes('Excess'), 'detail shows excess column');
   dom.window.close();
 }
 

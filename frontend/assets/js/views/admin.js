@@ -203,15 +203,18 @@ async function orderDetail(view, orderId, ctx) {
   try {
     const order = await api('admin.orders.detail', { order_id: orderId });
     const st = order.status;
-    const rows = order.items.map(it =>
-      '<tr><td><b>' + esc(it.item_name) + '</b><div class="sub">' + esc(it.item_code || '') + '</div></td>' +
+    const rows = order.items.map(it => {
+      const excess = Math.max(0, (Number(it.received_quantity) || 0) - (Number(it.sent_quantity) || 0));
+      return '<tr><td><b>' + esc(it.item_name) + '</b><div class="sub">' + esc(it.item_code || '') + '</div></td>' +
       '<td class="center">' + numberCell(it.requested_quantity, it.unit) + '</td>' +
       '<td class="center">' + numberCell(it.approved_quantity, it.unit) + '</td>' +
       '<td class="center">' + numberCell(it.sent_quantity, it.unit) + '</td>' +
       '<td class="center">' + numberCell(it.received_quantity, it.unit) + '</td>' +
-      '<td class="center">' + (it.shortage_quantity !== null ? numberCell(it.shortage_quantity, it.unit) : t('common.none')) + '</td>' +
+      '<td class="center">' + (it.shortage_quantity > 0 ? numberCell(it.shortage_quantity, it.unit) : t('common.none')) + '</td>' +
+      '<td class="center hide-sm">' + (excess > 0 ? '+' + fmtNum(excess) : t('common.none')) + '</td>' +
       (st === 'shortage_reported' || st === 'partially_received' ? '<td>' + esc(it.shortage_reason || '') + '</td>' : '') +
-      '</tr>').join('');
+      '</tr>';
+    }).join('');
 
     const meta =
       '<div class="card"><div class="card-head"><h3 class="mono">' + esc(order.order_number) + '</h3>' + badge(order.status) + '</div>' +
@@ -224,6 +227,7 @@ async function orderDetail(view, orderId, ctx) {
       '<div class="card"><div class="card-head"><h3>' + esc(t('order.items')) + '</h3></div>' +
       '<div class="table-wrap"><table class="tbl"><thead><tr>' +
       ['manage.itemName', 'order.requested', 'order.approved', 'order.sent', 'order.received', 'order.shortage'].map(k => '<th class="center">' + esc(t(k)) + '</th>').join('') +
+      '<th class="center hide-sm">' + esc(t('order.excess')) + '</th>' +
       (st === 'shortage_reported' || st === 'partially_received' ? '<th>' + esc(t('order.shortageReason')) + '</th>' : '') +
       '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
 
@@ -695,16 +699,16 @@ function tableFor(kind, rows) {
   const headers = {
     orders: ['order.number', 'order.branch', 'order.status', 'order.createdAt', 'order.sentAt', 'order.receivedAt', 'order.total', 'order.shortage'],
     branches: ['manage.branchName', 'admin.totalOrders', 'admin.drafts', 'admin.submitted', 'admin.sent', 'admin.received', 'admin.shortages', 'dashboard.totalShortage'],
-    items: ['manage.itemName', 'order.category', 'manage.unit', 'order.requested', 'order.approved', 'order.sent', 'order.received', 'order.shortage'],
+    items: ['manage.itemName', 'order.category', 'manage.unit', 'order.requested', 'order.approved', 'order.sent', 'order.received', 'order.shortage', 'order.excess'],
     shortages: ['order.number', 'manage.branchName', 'manage.itemName', 'order.sent', 'order.received', 'order.shortage', 'order.shortageReason', 'order.receivedAt']
   };
   const h = headers[kind];
-  const lowPriority = { 'order.sentAt': 'hide-md', 'order.receivedAt': 'hide-md', 'order.createdAt': 'hide-sm', 'admin.drafts': 'hide-md', 'admin.submitted': 'hide-md', 'order.category': 'hide-sm', 'manage.unit': 'hide-sm', 'order.approved': 'hide-sm' };
+  const lowPriority = { 'order.sentAt': 'hide-md', 'order.receivedAt': 'hide-md', 'order.createdAt': 'hide-sm', 'admin.drafts': 'hide-md', 'admin.submitted': 'hide-md', 'order.category': 'hide-sm', 'manage.unit': 'hide-sm', 'order.approved': 'hide-sm', 'order.excess': 'hide-sm' };
   if (!rows.length) return '<div class="empty">' + esc(t('reports.noData')) + '</div>';
   const render = {
     orders: r => `<tr><td><b class="mono">${esc(r.order_number)}</b></td><td>${esc(r.branch_name)}</td><td>${badge(r.status)}</td><td class="hide-sm">${esc(fmtDate(r.created_at))}</td><td class="hide-md">${esc(fmtDate(r.sent_at))}</td><td class="hide-md">${esc(fmtDate(r.received_at))}</td><td>${numberCell(r.total_requested)}</td><td>${numberCell(r.total_shortage)}</td></tr>`,
     branches: r => `<tr><td><b>${esc(r.branch_name)}</b></td><td class="center">${fmtNum(r.orders)}</td><td class="center hide-md">${fmtNum(r.drafts || 0)}</td><td class="center hide-md">${fmtNum(r.submitted)}</td><td class="center">${fmtNum(r.sent)}</td><td class="center">${fmtNum(r.received)}</td><td class="center">${fmtNum(r.shortage_orders)}</td><td class="center">${fmtNum(r.shortage_total)}</td></tr>`,
-    items: r => `<tr><td><b>${esc(r.item_name)}</b></td><td class="hide-sm">${esc(r.category)}</td><td class="hide-sm">${esc(r.unit)}</td><td class="center">${fmtNum(r.requested)}</td><td class="center hide-sm">${fmtNum(r.approved)}</td><td class="center">${fmtNum(r.sent)}</td><td class="center">${fmtNum(r.received)}</td><td class="center">${fmtNum(r.shortage)}</td></tr>`,
+    items: r => { const ex = Math.max(0, (Number(r.received) || 0) - (Number(r.sent) || 0)); return `<tr><td><b>${esc(r.item_name)}</b></td><td class="hide-sm">${esc(r.category)}</td><td class="hide-sm">${esc(r.unit)}</td><td class="center">${fmtNum(r.requested)}</td><td class="center hide-sm">${fmtNum(r.approved)}</td><td class="center">${fmtNum(r.sent)}</td><td class="center">${fmtNum(r.received)}</td><td class="center">${fmtNum(r.shortage)}</td><td class="center hide-sm">${ex > 0 ? '+' + fmtNum(ex) : esc(t('common.none'))}</td></tr>`; },
     shortages: r => `<tr><td><b class="mono">${esc(r.order_number)}</b></td><td>${esc(r.branch_name)}</td><td>${esc(r.item_name)}</td><td class="center">${fmtNum(r.sent_quantity)}</td><td class="center">${fmtNum(r.received_quantity)}</td><td class="center">${fmtNum(r.shortage_quantity)}</td><td>${esc(r.shortage_reason || '')}</td><td class="hide-md">${esc(fmtDate(r.received_at))}</td></tr>`
   }[kind];
   return '<div class="table-wrap"><table class="tbl"><thead><tr>' + h.map(k => '<th' + (lowPriority[k] ? ' class="' + lowPriority[k] + '"' : '') + '>' + esc(t(k)) + '</th>').join('') + '</tr></thead><tbody>' +

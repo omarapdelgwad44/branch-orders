@@ -314,15 +314,18 @@ async function orderDetail(view, orderId, ctx) {
     ];
     const isStatement = ['sent', 'partially_received', 'shortage_reported', 'received'].indexOf(order.status) !== -1;
 
-    const rows = order.items.map(it =>
-      '<tr><td><b>' + esc(it.item_name) + '</b><div class="sub">' + esc(it.item_code || '') + '</div></td>' +
+    const rows = order.items.map(it => {
+      const excess = Math.max(0, (Number(it.received_quantity) || 0) - (Number(it.sent_quantity) || 0));
+      return '<tr><td><b>' + esc(it.item_name) + '</b><div class="sub">' + esc(it.item_code || '') + '</div></td>' +
       '<td class="center">' + numberCell(it.requested_quantity, it.unit) + '</td>' +
       '<td class="center">' + numberCell(it.approved_quantity, it.unit) + '</td>' +
       '<td class="center">' + numberCell(it.sent_quantity, it.unit) + '</td>' +
       '<td class="center">' + numberCell(it.received_quantity, it.unit) + '</td>' +
-      '<td class="center">' + (it.shortage_quantity !== null ? numberCell(it.shortage_quantity, it.unit) : t('common.none')) + '</td>' +
+      '<td class="center">' + (it.shortage_quantity > 0 ? numberCell(it.shortage_quantity, it.unit) : t('common.none')) + '</td>' +
+      '<td class="center hide-sm">' + (excess > 0 ? '+' + fmtNum(excess) : t('common.none')) + '</td>' +
       (isStatement ? '<td>' + esc(it.shortage_reason || '') + '</td>' : '') +
-      '</tr>').join('');
+      '</tr>';
+    }).join('');
 
     const meta =
       '<div class="card"><div class="card-head"><h3 class="mono">' + esc(order.order_number) + '</h3>' + badge(order.status) + '</div>' +
@@ -342,6 +345,7 @@ async function orderDetail(view, orderId, ctx) {
       '<th class="center">' + esc(t('order.sent')) + '</th>' +
       '<th class="center">' + esc(t('order.received')) + '</th>' +
       '<th class="center">' + esc(t('order.shortage')) + '</th>' +
+      '<th class="center hide-sm">' + esc(t('order.excess')) + '</th>' +
       (isStatement ? '<th>' + esc(t('order.shortageReason')) + '</th>' : '') +
       '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
 
@@ -394,7 +398,7 @@ function receivingModal(order, render) {
       return '<div class="recv-item" data-id="' + esc(it.item_id) + '" data-sent="' + sent + '">' +
       '<div class="recv-info"><b>' + esc(it.item_name) + '</b>' +
       '<em>' + esc(t('order.sent')) + ': ' + fmtNum(sent) + ' ' + esc(it.unit) + '</em>' +
-      '<div class="recv-short" data-short><span>' + esc(t('receiving.shortage')) + ':</span> <b>' + fmtNum(0) + '</b></div></div>' +
+      '<div class="recv-short hidden" data-short><span data-slabel></span> <b data-sval></b></div></div>' +
       '<div><div data-stepper>' + qtyControl(sent, null) + '</div>' +
       '<label class="recv-full"><input type="checkbox" data-full checked> ' + esc(t('receiving.full')) + '</label>' +
       '<div class="recv-reason hidden" data-reasonwrap><input class="input plain small-input" data-reason type="text" placeholder="' + esc(t('order.shortageReason')) + '"></div>' +
@@ -420,10 +424,21 @@ function receivingModal(order, render) {
     const sent = Number(row.dataset.sent) || 0;
     const received = readReceived(row);
     const shortage = Math.max(0, sent - received);
-    const badge = row.querySelector('[data-short]');
-    if (badge) {
-      badge.querySelector('b').textContent = fmtNum(shortage);
-      badge.classList.toggle('has-short', shortage > 0);
+    const excess = Math.max(0, received - sent);
+    const line = row.querySelector('[data-short]');
+    if (line) {
+      const lab = line.querySelector('[data-slabel]');
+      const val = line.querySelector('[data-sval]');
+      if (shortage > 0) {
+        if (lab) lab.textContent = t('receiving.shortage') + ':';
+        if (val) val.textContent = fmtNum(shortage);
+      } else if (excess > 0) {
+        if (lab) lab.textContent = t('order.excess') + ':';
+        if (val) val.textContent = '+' + fmtNum(excess);
+      }
+      line.classList.toggle('hidden', shortage <= 0 && excess <= 0);
+      line.classList.toggle('has-short', shortage > 0);
+      line.classList.toggle('has-excess', shortage <= 0 && excess > 0);
     }
     const wrap = row.querySelector('[data-reasonwrap]');
     if (wrap) wrap.classList.toggle('hidden', shortage <= 0);
