@@ -144,7 +144,7 @@ export function qtyControl(value, max) {
   const stepper =
     '<div class="qty">' +
     '<button type="button" class="qty-btn" data-q="-1" aria-label="' + esc(t('a11y.decrease')) + '">' + icon('minus', 14) + '</button>' +
-    '<input class="qty-val" type="number" inputmode="decimal" min="0" step="any" value="' + esc(value || '') + '" aria-label="' + esc(t('a11y.quantity')) + '">' +
+    '<input class="qty-val" type="number" inputmode="decimal" min="0" step="any" value="' + esc(value === null || value === undefined || value === '' ? '' : value) + '" aria-label="' + esc(t('a11y.quantity')) + '">' +
     '<button type="button" class="qty-btn" data-q="1" aria-label="' + esc(t('a11y.increase')) + '">' + icon('plus', 14) + '</button>' +
     '</div>';
   return stepper;

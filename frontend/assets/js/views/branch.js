@@ -113,7 +113,7 @@ async function orders(view) {
       '<div class="page-head"><div><h2>' + esc(t('nav.orders')) + '</h2></div>' +
       '<a class="btn btn-primary" href="#/order/new">' + icon('plus', 16) + ' ' + esc(t('dashboard.newOrder')) + '</a></div>' +
       '<div class="chips" id="chips"><button class="chip-btn active" data-s="">' + esc(t('order.all')) + '</button>' +
-      statuses.map(s => '<button class="chip-btn" data-s="' + s + '">' + badge(s) + '</button>').join('') + '</div>' +
+      statuses.map(s => '<button class="chip-btn chip-badge" data-s="' + s + '">' + badge(s) + '</button>').join('') + '</div>' +
       '<div class="card"><div class="table-wrap"><table class="tbl"><thead><tr>' +
       cell(['order.number', 'order.createdAt', 'order.status', 'order.total', 'common.actions']) +
       '</tr></thead><tbody id="tbody">' + historyRows(all) + '</tbody></table></div></div>';

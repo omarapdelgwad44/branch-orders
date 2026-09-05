@@ -634,6 +634,11 @@ td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
   .modal-foot .btn { flex: 1 1 auto; justify-content: center; }
   .tbl { min-width: 480px; }
   .tbl .hide-sm { display: none; }
+  /* Status filter chips wrap a colored badge inside a second pill outline;
+     on phones show only the inner badge to keep the row clean. */
+  .chip-btn.chip-badge { border-color: transparent; background: transparent; box-shadow: none; padding: 4px 2px; }
+  .chip-btn.chip-badge.active { border-color: transparent; background: transparent; }
+  .chip-btn.chip-badge.active .badge { outline: 2px solid var(--primary); outline-offset: 2px; }
   .hero-inner { padding: 22px; }
   .hero-stats { gap: 16px; }
   #toast-root { top: auto; bottom: 16px; inset-inline-end: 12px; inset-inline-start: 12px; width: auto; }

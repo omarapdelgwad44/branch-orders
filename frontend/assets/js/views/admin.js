@@ -247,11 +247,10 @@ async function orderDetail(view, orderId, ctx) {
 
     view.innerHTML =
       '<div class="page-head"><div><a class="btn btn-ghost" href="#/admin/orders">' + icon('chevL', 16, 'flip-rtl') + ' ' + esc(t('common.back')) + '</a></div>' +
-      '<div class="form-actions"><button class="btn btn-ghost" id="printBtn">' + icon('file', 15) + ' ' + esc(t('common.print')) + '</button>' + reportButtonsHtml() + '</div></div>' +
+      '<div class="form-actions">' + reportButtonsHtml() + '</div></div>' +
       '<div class="detail-grid">' + meta + itemsCard + '</div>' + notesCard +
       '<div class="detail-grid">' + timeline(order) + actionCards(order) + '</div>' + actionRow;
 
-    if (document.getElementById('printBtn')) document.getElementById('printBtn').addEventListener('click', () => window.print());
     bindReportButtons(order, { forAdmin: true });
 
     view.querySelectorAll('[data-act]').forEach(btn => {
@@ -287,6 +286,12 @@ function timeline(order) {
   steps.forEach(([s, ts], i) => { if (ts) lastReached = i; });
   if (['partially_received', 'shortage_reported'].indexOf(order.status) !== -1 && order.received_at) lastReached = 5;
   if (order.status === 'cancelled') lastReached = 6;
+  // approved and processing share the processed_at timestamp (set when
+  // processing starts), so light the approved node from status instead —
+  // otherwise a freshly approved order shows no approved indicator.
+  if (['approved', 'processing', 'sent', 'partially_received', 'shortage_reported', 'received'].indexOf(order.status) !== -1) {
+    lastReached = Math.max(lastReached, 2);
+  }
 
   return '<div class="card"><div class="card-head"><h3>' + esc(t('admin.timeline')) + '</h3></div>' +
     '<div class="tl">' + steps.map(([s, ts], i) => {
@@ -340,8 +345,10 @@ function qtyTransition(order, act, render) {
     const byItem = {};
     node.querySelectorAll('.recv-item').forEach(r => {
       const val = parseFloat(r.querySelector('.qty-val').value);
-      const fallback = prefill((order.items.filter(i => i.item_id === r.dataset.id)[0]) || { requested_quantity: 0 });
-      byItem[r.dataset.id] = !isNaN(val) ? val : fallback;
+      // All inputs are prefilled, so an empty/cleared input is an intentional
+      // removal: persist explicit 0. Falling back to requested/approved here
+      // would resurrect the deleted item in every later stage.
+      byItem[r.dataset.id] = !isNaN(val) ? val : 0;
     });
     const payload = { order_id: order.order_id, to: act, notes: (document.getElementById('qtyNotes').value || '') };
     if (qtyKey) payload[qtyKey] = byItem;

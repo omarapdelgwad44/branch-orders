@@ -82,6 +82,21 @@ if (scenario === 'admin') {
   const again = await apiCall('admin.orders.transition', { order_id: d.order_id, to: 'approved', approved_qty: { [IID]: 6 } }, AT);
   ok(again.ok === false, 'approved→approved rejected');
 
+  // approval removal: explicit 0 stays dropped through every later stage
+  const dz = await apiOk('orders.create', { items: { [IID]: 10 } }, ali.token);
+  await apiOk('orders.submit', { order_id: dz.order_id }, ali.token);
+  const zAppr = await apiOk('admin.orders.transition', { order_id: dz.order_id, to: 'approved', approved_qty: { [IID]: 0 } }, AT);
+  const zline = zAppr.items.find((i) => i.item_id === IID);
+  ok(zline.approved_quantity === 0 && zline.requested_quantity === 10, 'removed item approved=0, requested kept=10');
+  await apiOk('admin.orders.transition', { order_id: dz.order_id, to: 'processing' }, AT);
+  const zProc = await apiOk('admin.orders.detail', { order_id: dz.order_id }, AT);
+  ok(zProc.items.find((i) => i.item_id === IID).approved_quantity === 0, 'removed item stays 0 after processing');
+  await apiOk('admin.orders.transition', { order_id: dz.order_id, to: 'sent', sent_qty: { [IID]: 0 } }, AT);
+  const zRecv = await apiOk('orders.receive', { order_id: dz.order_id, quantities: { [IID]: 0 }, reasons: {} }, ali.token);
+  ok(zRecv.status === 'received', 'zero-qty order receives cleanly, got ' + zRecv.status);
+  const zRep = (await import('../frontend/assets/js/report.js')).buildReportHtml(zRecv, { forAdmin: true });
+  ok(zRep.includes('10'), 'report keeps requested 10 for dropped item');
+
   /* ================= pure report module ================= */
   const { canPrintReport, buildReportHtml } = await import('../frontend/assets/js/report.js');
   ok(canPrintReport(adminLogin.user, refetched) === true, 'admin can print authorized order');
@@ -145,6 +160,30 @@ if (scenario === 'admin') {
   ok(!!document.querySelector('[data-act="processing"]'), 'next action is Start processing');
   const viewText = document.getElementById('view').textContent;
   ok(viewText.includes('10') && viewText.includes('6'), 'detail shows requested 10 and approved 6');
+  ok(document.querySelectorAll('.tl-step.done').length >= 3, 'timeline lights the approved step');
+
+  // UI removal: clearing the approval input must persist as 0, not resurrect
+  const d3 = await apiOk('orders.create', { items: { [IID]: 8 } }, ali.token);
+  await apiOk('orders.submit', { order_id: d3.order_id }, ali.token);
+  await go('#/admin/orders/' + d3.order_id);
+  await click(document.querySelector('[data-act="approved"]'));
+  const clearInput = document.querySelector('#modal-root .qty-val');
+  clearInput.value = '';
+  clearInput.dispatchEvent(new window.Event('input', { bubbles: true }));
+  await click(document.getElementById('doTransition'));
+  await tick(350);
+  const chk3 = await apiOk('admin.orders.detail', { order_id: d3.order_id }, AT);
+  const l3 = chk3.items.find((i) => i.item_id === IID);
+  ok(l3.approved_quantity === 0 && l3.requested_quantity === 8, 'cleared input persists as approved=0, requested=8');
+  await go('#/admin/orders/' + d3.order_id);
+  await click(document.querySelector('[data-act="processing"]'));
+  await click(document.getElementById('doTransition'));
+  await tick(350);
+  await go('#/admin/orders/' + d3.order_id);
+  await click(document.querySelector('[data-act="sent"]'));
+  await tick(150);
+  const sentPrefill = document.querySelector('#modal-root .qty-val');
+  ok(!!sentPrefill && sentPrefill.value === '0', 'sent modal prefills dropped item as 0, got ' + (sentPrefill && sentPrefill.value));
 
   // print / download buttons
   ok(!!document.getElementById('reportPrint'), 'admin Print report button present');
