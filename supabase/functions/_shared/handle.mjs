@@ -107,6 +107,7 @@ export function createApp(store) {
     'admin.items.create': { guard: 'admin', handler: (body) => catalog.Items.create(body) },
     'admin.items.update': { guard: 'admin', handler: (body) => catalog.Items.update(String(body.item_id), body) },
     'admin.branchItems.save': { guard: 'admin', handler: (body) => catalog.Items.setBranchItems(String(body.branch_id), body.assignments || []) },
+    'admin.branchItems.list': { guard: 'admin', handler: async (body) => ({ assignments: await catalog.Items.branchAssignments(String(body.branch_id || '')) }) },
     'reports.orders': { guard: 'admin', handler: async (body) => ({ rows: await reports.ordersReport(body.filters || {}) }) },
     'reports.branches': { guard: 'admin', handler: async (body) => ({ rows: await reports.branchSummary(body.filters || {}) }) },
     'reports.items': { guard: 'admin', handler: async (body) => ({ rows: await reports.itemDemand(body.filters || {}) }) },

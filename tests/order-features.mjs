@@ -97,6 +97,29 @@ if (scenario === 'admin') {
   const zRep = (await import('../frontend/assets/js/report.js')).buildReportHtml(zRecv, { forAdmin: true });
   ok(zRep.includes('10'), 'report keeps requested 10 for dropped item');
 
+  // full lifecycle with modified quantities: 10 → approve 6 → send 5 → receive 4
+  const lf = await apiOk('orders.create', { items: { [IID]: 10 } }, ali.token);
+  await apiOk('orders.submit', { order_id: lf.order_id }, ali.token);
+  const lfAppr = await apiOk('admin.orders.transition', { order_id: lf.order_id, to: 'approved', approved_qty: { [IID]: 6 } }, AT);
+  const lfLine = lfAppr.items.find((i) => i.item_id === IID);
+  ok(lfLine.requested_quantity === 10 && lfLine.approved_quantity === 6, 'approval stores requested=10 approved=6');
+  ok(!!lfAppr.processed_at, 'approval date stamped, got ' + JSON.stringify(lfAppr.processed_at));
+  await apiOk('admin.orders.transition', { order_id: lf.order_id, to: 'processing' }, AT);
+  const lfProc = await apiOk('admin.orders.detail', { order_id: lf.order_id }, AT);
+  ok(lfProc.items.find((i) => i.item_id === IID).approved_quantity === 6, 'processing preserves approved=6');
+  ok(!!lfProc.processed_at, 'processing keeps approval date');
+  await apiOk('admin.orders.transition', { order_id: lf.order_id, to: 'sent', sent_qty: { [IID]: 5 } }, AT);
+  const lfSent = await apiOk('admin.orders.detail', { order_id: lf.order_id }, AT);
+  const lfSentLine = lfSent.items.find((i) => i.item_id === IID);
+  ok(lfSentLine.approved_quantity === 6 && lfSentLine.sent_quantity === 5, 'sent stage keeps approved=6, sent=5');
+  const lfRecv = await apiOk('orders.receive', { order_id: lf.order_id, quantities: { [IID]: 4 }, reasons: { [IID]: 'broken' } }, ali.token);
+  ok(lfRecv.status === 'shortage_reported', 'partial+reason → shortage_reported');
+  const lfDone = await apiOk('admin.orders.detail', { order_id: lf.order_id }, AT);
+  const lfDoneLine = lfDone.items.find((i) => i.item_id === IID);
+  ok(lfDoneLine.requested_quantity === 10 && lfDoneLine.approved_quantity === 6 &&
+    lfDoneLine.sent_quantity === 5 && lfDoneLine.received_quantity === 4 &&
+    lfDoneLine.shortage_quantity === 1, 'final quantities req=10 appr=6 sent=5 recv=4 short=1');
+
   /* ================= pure report module ================= */
   const { canPrintReport, buildReportHtml } = await import('../frontend/assets/js/report.js');
   ok(canPrintReport(adminLogin.user, refetched) === true, 'admin can print authorized order');
@@ -161,6 +184,8 @@ if (scenario === 'admin') {
   const viewText = document.getElementById('view').textContent;
   ok(viewText.includes('10') && viewText.includes('6'), 'detail shows requested 10 and approved 6');
   ok(document.querySelectorAll('.tl-step.done').length >= 3, 'timeline lights the approved step');
+  const tlApproved = document.querySelectorAll('.tl-step')[2];
+  ok(!!tlApproved && !tlApproved.querySelector('em').textContent.includes('—'), 'approval date displayed, got ' + (tlApproved && tlApproved.querySelector('em').textContent));
 
   // UI removal: clearing the approval input must persist as 0, not resurrect
   const d3 = await apiOk('orders.create', { items: { [IID]: 8 } }, ali.token);
@@ -203,6 +228,49 @@ if (scenario === 'admin') {
   ok(!!langTop && langTop.textContent.trim().length > 0, 'topbar language button has visible text');
   ok(!!langTop.getAttribute('aria-label'), 'topbar language button has aria-label');
 
+  // availability read-back + toggle persistence through the UI
+  const lst0 = await apiOk('admin.branchItems.list', { branch_id: 'BR-001' }, AT);
+  ok(lst0.assignments.some((a) => a.item_id === IID && a.is_available !== false), 'availability read-back defaults to enabled');
+  await apiOk('admin.branchItems.save', { branch_id: 'BR-001', assignments: [{ item_id: IID, is_available: false, max_quantity: '' }] }, AT);
+  const lst1 = await apiOk('admin.branchItems.list', { branch_id: 'BR-001' }, AT);
+  ok(lst1.assignments.some((a) => a.item_id === IID && a.is_available === false), 'disabled state saved + read back');
+  const denied = await apiCall('admin.branchItems.list', { branch_id: 'BR-001' }, ali.token);
+  ok(denied.ok === false, 'branch user blocked from availability read-back');
+  await go('#/admin/availability');
+  const row = document.querySelector('[data-row="' + IID + '"]');
+  ok(!!row, 'availability row renders');
+  if (row) {
+    const tg = row.querySelector('[data-toggle]');
+    const mx = row.querySelector('[data-max]');
+    ok(!!tg && !tg.checked, 'saved-disabled toggle renders off');
+    ok(!!mx && mx.disabled, 'qty input locked while disabled');
+    ok(row.classList.contains('av-off'), 'disabled row marked out of stock');
+    tg.checked = true;
+    tg.dispatchEvent(new window.Event('change', { bubbles: true }));
+    await tick(60);
+    ok(!row.classList.contains('av-off') && !mx.disabled, 're-enabling unlocks the row');
+    mx.value = '5';
+    mx.dispatchEvent(new window.Event('input', { bubbles: true }));
+    await click(document.getElementById('saveAv'));
+    await tick(250);
+  }
+  await go('#/admin/availability');
+  await tick(150);
+  const row2 = document.querySelector('[data-row="' + IID + '"]');
+  if (row2) {
+    ok(row2.querySelector('[data-toggle]').checked, 're-enabled toggle persists after refresh');
+    ok(row2.querySelector('[data-max]').value === '5', 'max qty persists after refresh, got ' + row2.querySelector('[data-max]').value);
+    const tg2 = row2.querySelector('[data-toggle]');
+    tg2.checked = false;
+    tg2.dispatchEvent(new window.Event('change', { bubbles: true }));
+    await click(document.getElementById('saveAv'));
+    await tick(250);
+  }
+  await go('#/admin/availability');
+  await tick(150);
+  const row3 = document.querySelector('[data-row="' + IID + '"]');
+  ok(!!row3 && !row3.querySelector('[data-toggle]').checked && row3.querySelector('[data-max]').disabled, 'disabled toggle persists after refresh (no revert)');
+
   dom.window.close();
 } else {
   /* ================= backend: receiving rules ================= */
@@ -236,6 +304,14 @@ if (scenario === 'admin') {
   const mona = await apiOk('auth.login', { username: 'mona.hassan', password: 'Demo@1234' });
   const cross = await apiCall('orders.detail', { order_id: oFull }, mona.token);
   ok(cross.ok === false, 'branch cannot view another branch order');
+
+  // disabled items stay hidden / non-orderable in the branch catalog
+  await apiOk('admin.branchItems.save', { branch_id: 'BR-001', assignments: [{ item_id: IID, is_available: false, max_quantity: '' }] }, AT);
+  const bcOff = await apiOk('catalog.list', {}, ali.token);
+  ok(!bcOff.items.some((i) => i.item_id === IID), 'disabled item hidden from branch catalog');
+  await apiOk('admin.branchItems.save', { branch_id: 'BR-001', assignments: [{ item_id: IID, is_available: true, max_quantity: '' }] }, AT);
+  const bcOn = await apiOk('catalog.list', {}, ali.token);
+  ok(bcOn.items.some((i) => i.item_id === IID), 're-enabled item returns to branch catalog');
 
   /* ================= UI (jsdom): receiving + rows + report ================= */
   const dom = new JSDOM(

@@ -292,6 +292,10 @@ function timeline(order) {
   if (['approved', 'processing', 'sent', 'partially_received', 'shortage_reported', 'received'].indexOf(order.status) !== -1) {
     lastReached = Math.max(lastReached, 2);
   }
+  // approved and processing share processed_at (stamped at approval), so cap
+  // the freshly-approved state at the approved node — processing lights up
+  // only once the status actually advances.
+  if (order.status === 'approved') lastReached = Math.min(lastReached, 2);
 
   return '<div class="card"><div class="card-head"><h3>' + esc(t('admin.timeline')) + '</h3></div>' +
     '<div class="tl">' + steps.map(([s, ts], i) => {
@@ -554,22 +558,41 @@ async function availability(view) {
       if (!currentBranch) return;
       view.querySelector('#avTable').innerHTML = skeletons(1, 5);
       try {
-        const full = await api('catalog.list');
+        const res = await api('admin.branchItems.list', { branch_id: currentBranch });
         assignments = {};
-        full.items.forEach(i => assignments[i.item_id] = { available: i.active !== false, max: '' });
-        view.querySelector('#avTable').innerHTML = activeItems.map(i =>
-          '<tr><td><b>' + esc(i.item_name) + '</b></td><td>' + esc(i.unit) + '</td>' +
-          '<td><label class="switch"><input type="checkbox" data-toggle="' + esc(i.item_id) + '"' + (availSafe(i.item_id) ? ' checked' : '') + '><span class="slider"></span></label></td>' +
-          '<td><input class="input plain small-input" type="number" min="0" data-max="' + esc(i.item_id) + '" value="' + esc(maxSafe(i.item_id) || '') + '" placeholder="âˆž"></td></tr>').join('') ||
-          '<tr><td colspan="4"><div class="empty small">' + esc(t('reports.noData')) + '</div></td></tr>';
+        (res.assignments || []).forEach(a => {
+          assignments[a.item_id] = {
+            available: a.is_available !== false,
+            max: (a.max_quantity === '' || a.max_quantity === null || a.max_quantity === undefined) ? '' : a.max_quantity
+          };
+        });
+        paintRows();
         bindTable();
       } catch (e) { view.querySelector('#avTable').innerHTML = '<tr><td colspan="4"><div class="empty small">' + esc(errorText(e)) + '</div></td></tr>'; }
     };
+    function paintRows() {
+      view.querySelector('#avTable').innerHTML = activeItems.map(i => {
+        const off = !availSafe(i.item_id);
+        return '<tr data-row="' + esc(i.item_id) + '"' + (off ? ' class="av-off"' : '') + '>' +
+          '<td><b>' + esc(i.item_name) + '</b> <span class="badge badge-gray av-tag">' + esc(t('manage.notAvail')) + '</span></td><td>' + esc(i.unit) + '</td>' +
+          '<td><label class="switch"><input type="checkbox" data-toggle="' + esc(i.item_id) + '"' + (off ? '' : ' checked') + '><span class="slider"></span></label></td>' +
+          '<td><input class="input plain small-input" type="number" min="0" data-max="' + esc(i.item_id) + '" value="' + esc(maxSafe(i.item_id)) + '"' + (off ? ' disabled' : '') + ' placeholder="∞"></td></tr>';
+      }).join('') ||
+        '<tr><td colspan="4"><div class="empty small">' + esc(t('reports.noData')) + '</div></td></tr>';
+    }
     function availSafe(id) { return assignments[id] ? assignments[id].available !== false : true; }
     function maxSafe(id) { return assignments[id] && assignments[id].max ? assignments[id].max : ''; }
     function bindTable() {
       view.querySelectorAll('[data-toggle]').forEach(tg => {
-        tg.addEventListener('change', () => { assignments[tg.dataset.toggle].available = tg.checked; });
+        tg.addEventListener('change', () => {
+          const id = tg.dataset.toggle;
+          if (!assignments[id]) assignments[id] = { available: true, max: '' };
+          assignments[id].available = tg.checked;
+          const tr = tg.closest('tr');
+          if (tr) tr.classList.toggle('av-off', !tg.checked);
+          const max = view.querySelector('[data-max="' + id + '"]');
+          if (max) max.disabled = !tg.checked;
+        });
       });
       view.querySelectorAll('[data-max]').forEach(inp => {
         inp.addEventListener('input', () => { assignments[inp.dataset.max].max = inp.value; });

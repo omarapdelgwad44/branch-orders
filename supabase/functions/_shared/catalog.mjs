@@ -241,6 +241,27 @@ export function createCatalog(store, cfg, ids, activity, auth) {
       await activity.log(null, 'item_updated', 'item', itemId, {});
       return updated;
     },
+    async branchAssignments(branchId) {
+      const branch = await store.find('Branches', 'branch_id', branchId);
+      if (!branch) fail('not_found', 'Branch not found.');
+      const items = await this.list();
+      const avail = await store.all('Branch_Items');
+      const byItem = {};
+      avail.forEach((a) => {
+        if (String(a.branch_id) === String(branchId)) {
+          byItem[String(a.item_id)] = {
+            is_available: String(a.is_available) !== 'false' && a.is_available !== false,
+            max_quantity: a.max_quantity === '' || a.max_quantity === null || a.max_quantity === undefined
+              ? '' : Number(a.max_quantity)
+          };
+        }
+      });
+      return items.map((it) => ({
+        item_id: it.item_id,
+        is_available: byItem[it.item_id] ? byItem[it.item_id].is_available : true,
+        max_quantity: byItem[it.item_id] ? byItem[it.item_id].max_quantity : ''
+      }));
+    },
     async setBranchItems(branchId, assignments) {
       if (!Array.isArray(assignments)) fail('validation', 'Assignments must be an array.');
       const branch = await store.find('Branches', 'branch_id', branchId);

@@ -163,6 +163,13 @@ textarea.input { height: auto; padding: 10px 13px; resize: vertical; min-height:
 .switch input:checked + .slider::before { transform: translateX(19px); }
 [dir='rtl'] .switch input:checked + .slider::before { transform: translateX(-19px); }
 
+/* ============ availability ============ */
+.av-tag { display: none; }
+tr.av-off .av-tag { display: inline-flex; }
+tr.av-off td:first-child b { color: var(--faint); }
+tr.av-off td { color: var(--muted); }
+.input:disabled { opacity: .55; background: var(--surface-2); cursor: not-allowed; }
+
 /* ============ layout shell ============ */
 .shell { min-height: 100vh; }
 
@@ -306,7 +313,7 @@ td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
   padding: 4px 11px; border-radius: 999px; font-size: .78rem; font-weight: 700;
   white-space: nowrap;
 }
-.badge .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.badge .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; box-shadow: 0 0 0 2px rgba(255, 255, 255, .8); }
 .badge-slate { background: var(--slate-soft); color: var(--slate); }
 .badge-amber { background: var(--amber-soft); color: var(--amber); }
 .badge-blue { background: var(--blue-soft); color: var(--blue); }
@@ -365,6 +372,9 @@ td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
   font-variant-numeric: tabular-nums;
 }
 .qty-val:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+/* Quantities use the custom +/- steppers only — hide native spin buttons. */
+.qty-val::-webkit-outer-spin-button, .qty-val::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.qty-val[type='number'] { -moz-appearance: textfield; appearance: textfield; }
 
 .order-card { position: sticky; top: 84px; }
 .summary { display: grid; gap: 7px; margin-bottom: 14px; }

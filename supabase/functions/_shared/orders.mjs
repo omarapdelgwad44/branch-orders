@@ -378,7 +378,7 @@ export function createOrders(store, cfg, ids, activity, Items) {
       admin_notes: payload.notes === undefined ? (row.admin_notes || '') : String(payload.notes || '')
     };
     if (to === ORDER_STATUS.APPROVED) {
-      patch.processed_at = '';
+      patch.processed_at = await cfg.now();
       await applyQty(orderId, 'approved_quantity', payload.approved_qty);
     }
     if (to === ORDER_STATUS.PROCESSING) {
