@@ -96,6 +96,8 @@ if (scenario === 'admin') {
   ok(zRecv.status === 'received', 'zero-qty order receives cleanly, got ' + zRecv.status);
   const zRep = (await import('../frontend/assets/js/report.js')).buildReportHtml(zRecv, { forAdmin: true });
   ok(zRep.includes('10'), 'report keeps requested 10 for dropped item');
+  ok(zRep.includes('Branch accountant signature') && zRep.includes('Branch stamp'), 'report has accountant + stamp blocks');
+  ok(zRecv.status === 'received' && zRep.includes('Receiver signature'), 'received report has receiver block');
 
   // full lifecycle with modified quantities: 10 → approve 6 → send 5 → receive 4
   const lf = await apiOk('orders.create', { items: { [IID]: 10 } }, ali.token);
