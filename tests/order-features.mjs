@@ -212,6 +212,19 @@ if (scenario === 'admin') {
   const sentPrefill = document.querySelector('#modal-root .qty-val');
   ok(!!sentPrefill && sentPrefill.value === '0', 'sent modal prefills dropped item as 0, got ' + (sentPrefill && sentPrefill.value));
 
+  // processing modal must show approved values (not requested) and persist edits
+  await go('#/admin/orders/' + d2.order_id);
+  await click(document.querySelector('[data-act="processing"]'));
+  await tick(120);
+  const procPrefill = document.querySelector('#modal-root .qty-val');
+  ok(!!procPrefill && procPrefill.value === '6', 'processing modal shows approved 6, got ' + (procPrefill && procPrefill.value));
+  procPrefill.value = '5';
+  await click(document.getElementById('doTransition'));
+  await tick(350);
+  const chkProc = await apiOk('admin.orders.detail', { order_id: d2.order_id }, AT);
+  const lProc = chkProc.items.find((i) => i.item_id === IID);
+  ok(lProc.approved_quantity === 5 && lProc.requested_quantity === 10, 'processing edit persists approved=5, requested=10');
+
   // print / download buttons
   ok(!!document.getElementById('reportPrint'), 'admin Print report button present');
   ok(!!document.getElementById('reportDownload'), 'admin Download report button present');

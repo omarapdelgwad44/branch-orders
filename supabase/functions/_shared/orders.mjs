@@ -382,7 +382,7 @@ export function createOrders(store, cfg, ids, activity, Items) {
       await applyQty(orderId, 'approved_quantity', payload.approved_qty);
     }
     if (to === ORDER_STATUS.PROCESSING) {
-      if (String(current) === ORDER_STATUS.SUBMITTED) await applyQty(orderId, 'approved_quantity', payload.approved_qty);
+      await applyQty(orderId, 'approved_quantity', payload.approved_qty);
       patch.processed_at = row.processed_at || await cfg.now();
     }
     if (to === ORDER_STATUS.SENT) {

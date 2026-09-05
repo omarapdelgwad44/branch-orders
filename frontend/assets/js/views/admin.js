@@ -329,12 +329,13 @@ async function transition(order, act, render) {
 
 function qtyTransition(order, act, render) {
   // Payload keys must match the backend contract in orders.mjs adminTransition:
-  // approved_qty is applied on submitted→approved and on the submitted→processing bypass.
-  const qtyKey = act === 'approved' ? 'approved_qty'
-    : act === 'sent' ? 'sent_qty'
-    : (act === 'processing' && order.status === 'submitted') ? 'approved_qty' : null;
-  const prefill = act === 'sent' ? (it => it.approved_quantity !== null ? it.approved_quantity : it.requested_quantity)
-    : (it => it.requested_quantity);
+  // approved_qty is applied on submitted→approved and on →processing, so
+  // edits made in the processing modal are persisted instead of dropped.
+  const qtyKey = act === 'approved' || act === 'processing' ? 'approved_qty'
+    : act === 'sent' ? 'sent_qty' : null;
+  // Always show the latest approved values (falling back to requested only
+  // when nothing was approved yet) — never silently revert to requested.
+  const prefill = (it) => (it.approved_quantity === null || it.approved_quantity === undefined || it.approved_quantity === '' ? it.requested_quantity : it.approved_quantity);
   const body = '<p class="modal-msg">' + (act === 'sent' ? esc(t('admin.transition.warn.sent')) : esc(t('admin.transition.warn.approve'))) + '</p>' +
     '<div class="qty-modal-list">' + order.items.map(it =>
       '<div class="recv-item" data-id="' + esc(it.item_id) + '">' +
