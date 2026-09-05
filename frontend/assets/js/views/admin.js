@@ -56,13 +56,13 @@ async function dashboard(view) {
     flow.forEach(s => flowCounts[s] = 0);
     m.recentOrders.forEach(o => { if (flowCounts[o.status] !== undefined) flowCounts[o.status]++; });
     const maxFlow = Math.max(1, ...flow.map(s => flowCounts[s]));
-    const flowHtml = '<div class="flow-bar">' + flow.map(s => {
+    const flowHtml = '<div class="flow-scroll" tabindex="0" role="region"><div class="flow-bar">' + flow.map(s => {
       const pct = Math.round((flowCounts[s] / maxFlow) * 100);
       const safe = Math.max(flowCounts[s] ? 8 : 0, 4);
       return '<div class="flow-col"><span class="flow-num">' + flowCounts[s] + '</span>' +
         '<div class="flow-track"><div class="flow-fill f-' + (STATUS_TYPES[s] || 'slate') + '" style="height:' + safe + '%"></div></div>' +
         '<span class="flow-label">' + esc(t('status.' + s)) + '</span></div>';
-    }).join('') + '</div>';
+    }).join('') + '</div></div>';
 
     view.innerHTML = header(t('nav.adminDashboard')) +
       '<div class="kpi-row">' + kpis.map(k =>
@@ -79,8 +79,8 @@ async function dashboard(view) {
         '<span class="ti-short">' + fmtNum(it.shortage) + '</span></div>').join('') + '</div>' : '<div class="empty small">' + esc(t('reports.noData')) + '</div>') + '</div>' +
       '</div>' +
       '<div class="card"><div class="card-head"><h3>' + esc(t('admin.recent')) + '</h3><a class="link" href="#/admin/orders">' + esc(t('dashboard.viewAll')) + '</a></div>' +
-      (m.recentOrders.length ? '<div class="table-wrap"><table class="tbl"><thead><tr><th>' + esc(t('order.number')) + '</th><th>' + esc(t('order.branch')) + '</th><th>' + esc(t('order.status')) + '</th><th>' + esc(t('order.createdAt')) + '</th><th></th></tr></thead><tbody>' +
-        m.recentOrders.map(o => '<tr><td><b class="mono">' + esc(o.order_number || o.order_id) + '</b></td><td>' + esc(o.branch_name) + '</td><td>' + badge(o.status) + '</td><td>' + esc(fmtDate(o.created_at)) + '</td>' +
+      (m.recentOrders.length ? '<div class="table-wrap"><table class="tbl"><thead><tr><th>' + esc(t('order.number')) + '</th><th>' + esc(t('order.branch')) + '</th><th>' + esc(t('order.status')) + '</th><th class="hide-sm">' + esc(t('order.createdAt')) + '</th><th></th></tr></thead><tbody>' +
+        m.recentOrders.map(o => '<tr><td><b class="mono">' + esc(o.order_number || o.order_id) + '</b></td><td>' + esc(o.branch_name) + '</td><td>' + badge(o.status) + '</td><td class="hide-sm">' + esc(fmtDate(o.created_at)) + '</td>' +
         '<td><a class="btn btn-ghost btn-sm" href="#/admin/orders/' + esc(o.order_id) + '">' + esc(t('order.view')) + '</a></td></tr>').join('') +
         '</tbody></table></div>' : '<div class="empty small">' + esc(t('reports.noData')) + '</div>') + '</div>' +
       '<div class="card"><div class="card-head"><h3>' + esc(t('admin.activity')) + '</h3></div>' +
@@ -146,7 +146,7 @@ async function orders(view) {
     '<button class="btn btn-ghost" id="f-reset">' + esc(t('admin.reset')) + '</button>' +
     '</div></div>' +
     '<div class="card"><div class="table-wrap"><table class="tbl"><thead><tr>' +
-    ['order.number', 'order.branch', 'order.status', 'order.createdAt', 'order.sentAt', 'order.total', 'common.actions'].map(k => '<th>' + esc(t(k)) + '</th>').join('') +
+    ['order.number', 'order.branch', 'order.status', 'order.createdAt', 'order.sentAt', 'order.total', 'common.actions'].map(k => '<th' + ((k === 'order.sentAt') ? ' class="hide-md"' : (k === 'order.createdAt' ? ' class="hide-sm"' : '')) + '>' + esc(t(k)) + '</th>').join('') +
     '</tr></thead><tbody id="tableBody">' + skeletons(1, 5) + '</tbody></table></div>' +
     '<div class="pager"><span id="pageInfo"></span><div>' +
     '<button class="btn btn-ghost btn-sm" id="prevPage">‹</button><button class="btn btn-ghost btn-sm" id="nextPage">›</button></div></div></div>';
@@ -160,7 +160,7 @@ async function orders(view) {
       document.getElementById('pageInfo').textContent = res.total + ' · ' + t('order.all');
       tbody.innerHTML = res.orders.length ? res.orders.map(o =>
         '<tr><td><b class="mono">' + esc(o.order_number || o.order_id) + '</b></td><td>' + esc(o.branch_name) + '</td>' +
-        '<td>' + badge(o.status) + '</td><td>' + esc(fmtDate(o.created_at)) + '</td><td>' + esc(fmtDate(o.sent_at)) + '</td>' +
+        '<td>' + badge(o.status) + '</td><td class="hide-sm">' + esc(fmtDate(o.created_at)) + '</td><td class="hide-md">' + esc(fmtDate(o.sent_at)) + '</td>' +
         '<td>' + numberCell(o.total_requested) + '</td>' +
         '<td><a class="btn btn-ghost btn-sm" href="#/admin/orders/' + esc(o.order_id) + '">' + esc(t('order.view')) + '</a></td></tr>').join('') :
         '<tr><td colspan="7"><div class="empty small">' + esc(t('dashboard.noOrders')) + '</div></td></tr>';
@@ -661,13 +661,14 @@ function tableFor(kind, rows) {
     shortages: ['order.number', 'manage.branchName', 'manage.itemName', 'order.sent', 'order.received', 'order.shortage', 'order.shortageReason', 'order.receivedAt']
   };
   const h = headers[kind];
+  const lowPriority = { 'order.sentAt': 'hide-md', 'order.receivedAt': 'hide-md', 'order.createdAt': 'hide-sm', 'admin.drafts': 'hide-md', 'admin.submitted': 'hide-md', 'order.category': 'hide-sm', 'manage.unit': 'hide-sm', 'order.approved': 'hide-sm' };
   if (!rows.length) return '<div class="empty">' + esc(t('reports.noData')) + '</div>';
   const render = {
-    orders: r => `<tr><td><b class="mono">${esc(r.order_number)}</b></td><td>${esc(r.branch_name)}</td><td>${badge(r.status)}</td><td>${esc(fmtDate(r.created_at))}</td><td>${esc(fmtDate(r.sent_at))}</td><td>${esc(fmtDate(r.received_at))}</td><td>${numberCell(r.total_requested)}</td><td>${numberCell(r.total_shortage)}</td></tr>`,
-    branches: r => `<tr><td><b>${esc(r.branch_name)}</b></td><td class="center">${fmtNum(r.orders)}</td><td class="center">${fmtNum(r.drafts || 0)}</td><td class="center">${fmtNum(r.submitted)}</td><td class="center">${fmtNum(r.sent)}</td><td class="center">${fmtNum(r.received)}</td><td class="center">${fmtNum(r.shortage_orders)}</td><td class="center">${fmtNum(r.shortage_total)}</td></tr>`,
-    items: r => `<tr><td><b>${esc(r.item_name)}</b></td><td>${esc(r.category)}</td><td>${esc(r.unit)}</td><td class="center">${fmtNum(r.requested)}</td><td class="center">${fmtNum(r.approved)}</td><td class="center">${fmtNum(r.sent)}</td><td class="center">${fmtNum(r.received)}</td><td class="center">${fmtNum(r.shortage)}</td></tr>`,
-    shortages: r => `<tr><td><b class="mono">${esc(r.order_number)}</b></td><td>${esc(r.branch_name)}</td><td>${esc(r.item_name)}</td><td class="center">${fmtNum(r.sent_quantity)}</td><td class="center">${fmtNum(r.received_quantity)}</td><td class="center">${fmtNum(r.shortage_quantity)}</td><td>${esc(r.shortage_reason || '')}</td><td>${esc(fmtDate(r.received_at))}</td></tr>`
+    orders: r => `<tr><td><b class="mono">${esc(r.order_number)}</b></td><td>${esc(r.branch_name)}</td><td>${badge(r.status)}</td><td class="hide-sm">${esc(fmtDate(r.created_at))}</td><td class="hide-md">${esc(fmtDate(r.sent_at))}</td><td class="hide-md">${esc(fmtDate(r.received_at))}</td><td>${numberCell(r.total_requested)}</td><td>${numberCell(r.total_shortage)}</td></tr>`,
+    branches: r => `<tr><td><b>${esc(r.branch_name)}</b></td><td class="center">${fmtNum(r.orders)}</td><td class="center hide-md">${fmtNum(r.drafts || 0)}</td><td class="center hide-md">${fmtNum(r.submitted)}</td><td class="center">${fmtNum(r.sent)}</td><td class="center">${fmtNum(r.received)}</td><td class="center">${fmtNum(r.shortage_orders)}</td><td class="center">${fmtNum(r.shortage_total)}</td></tr>`,
+    items: r => `<tr><td><b>${esc(r.item_name)}</b></td><td class="hide-sm">${esc(r.category)}</td><td class="hide-sm">${esc(r.unit)}</td><td class="center">${fmtNum(r.requested)}</td><td class="center hide-sm">${fmtNum(r.approved)}</td><td class="center">${fmtNum(r.sent)}</td><td class="center">${fmtNum(r.received)}</td><td class="center">${fmtNum(r.shortage)}</td></tr>`,
+    shortages: r => `<tr><td><b class="mono">${esc(r.order_number)}</b></td><td>${esc(r.branch_name)}</td><td>${esc(r.item_name)}</td><td class="center">${fmtNum(r.sent_quantity)}</td><td class="center">${fmtNum(r.received_quantity)}</td><td class="center">${fmtNum(r.shortage_quantity)}</td><td>${esc(r.shortage_reason || '')}</td><td class="hide-md">${esc(fmtDate(r.received_at))}</td></tr>`
   }[kind];
-  return '<div class="table-wrap"><table class="tbl"><thead><tr>' + h.map(k => '<th>' + esc(t(k)) + '</th>').join('') + '</tr></thead><tbody>' +
+  return '<div class="table-wrap"><table class="tbl"><thead><tr>' + h.map(k => '<th' + (lowPriority[k] ? ' class="' + lowPriority[k] + '"' : '') + '>' + esc(t(k)) + '</th>').join('') + '</tr></thead><tbody>' +
     rows.map(render).join('') + '</tbody></table></div>';
 }

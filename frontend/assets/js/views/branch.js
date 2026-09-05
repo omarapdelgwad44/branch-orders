@@ -5,7 +5,7 @@
 import { t, fmtDate, fmtNum, errorText } from '../i18n.js';
 import { api } from '../api.js';
 import { icon } from '../icons.js';
-import { badge, skeletons, qtyControl, attachQty, toast, confirmDialog, openModal, closeModal, numberCell, esc } from '../ui.js';
+import { badge, skeletons, qtyControl, attachQty, toast, confirmDialog, openModal, closeModal, numberCell, esc, debounce } from '../ui.js';
 
 const catalogCache = { at: 0, items: [] };
 
@@ -29,7 +29,8 @@ export function render(type, view, ctx) {
 }
 
 function cell(keys) {
-  return keys.map(k => '<th>' + esc(t(k)) + '</th>').join('');
+  const low = { 'order.createdAt': 'hide-sm', 'order.sentAt': 'hide-md', 'order.receivedAt': 'hide-md' };
+  return keys.map(k => '<th' + (low[k] ? ' class="' + low[k] + '"' : '') + '>' + esc(t(k)) + '</th>').join('');
 }
 
 function emptyState(msg) {
@@ -90,7 +91,7 @@ function header(ctx) {
 function rowHtml(o) {
   return '<tr data-id="' + esc(o.order_id) + '">' +
     '<td><b class="mono">' + esc(o.order_number) + '</b></td>' +
-    '<td>' + esc(fmtDate(o.created_at)) + '</td>' +
+    '<td class="hide-sm">' + esc(fmtDate(o.created_at)) + '</td>' +
     '<td>' + badge(o.status) + '</td>' +
     '<td>' + numberCell(o.total_requested) + '</td>' +
     '<td><a class="btn btn-ghost btn-sm" href="#/order/' + esc(o.order_id) + '">' + esc(t('order.view')) + '</a></td></tr>';
@@ -159,19 +160,48 @@ async function newOrder(view, ctx) {
   let q = '';
   let cat = '';
 
-  function draw() {
-    const filtered = itemsData.filter(i => {
+  function filteredItems() {
+    return itemsData.filter(i => {
       if (cat && i.category !== cat) return false;
       if (q && (i.item_name + ' ' + (i.item_code || '')).toLowerCase().indexOf(q) === -1) return false;
       return true;
     });
-    const rows = filtered.map(i =>
+  }
+
+  function rowsHtml(list) {
+    return list.map(i =>
       '<div class="pick-row" data-id="' + esc(i.item_id) + '">' +
       '<div class="pick-info"><b>' + esc(i.item_name) + '</b>' +
       '<span class="pick-meta">' + esc(i.category) + ' · ' + esc(i.unit) +
       (i.max_quantity ? ' · max ' + fmtNum(i.max_quantity) : '') + '</span></div>' +
       '<div data-stepper>' + qtyControl(selected[i.item_id] || '', i.max_quantity) + '</div>' +
       '</div>').join('');
+  }
+
+  function updateList() {
+    const list = document.getElementById('pickList');
+    if (!list) return;
+    const filtered = filteredItems();
+    list.innerHTML = filtered.length ? rowsHtml(filtered) : '<div class="empty small">' + esc(t('order.noCatalog')) + '</div>';
+    attachQty(list);
+  }
+
+  const debouncedSearch = debounce((value, input) => {
+    q = String(value || '').toLowerCase();
+    updateList();
+    const fresh = document.getElementById('itemSearch');
+    if (fresh && document.activeElement !== fresh) {
+      fresh.focus();
+      try {
+        const pos = fresh.value.length;
+        fresh.setSelectionRange(pos, pos);
+      } catch (e) { /* ignore */ }
+    }
+  }, 150);
+
+  function draw() {
+    const filtered = filteredItems();
+    const rows = rowsHtml(filtered);
 
     view.innerHTML =
       '<div class="page-head"><div><h2>' + esc(order ? ('#' + order.order_number) : t('nav.newOrder')) + '</h2>' +
@@ -217,8 +247,8 @@ async function newOrder(view, ctx) {
       selected[row.dataset.id] = !isNaN(val) && val > 0 ? val : '';
       redrawSummary();
     });
-    document.getElementById('itemSearch').addEventListener('input', (e) => { q = e.target.value.toLowerCase(); draw(); });
-    document.getElementById('catFilter').addEventListener('change', (e) => { cat = e.target.value; draw(); });
+    document.getElementById('itemSearch').addEventListener('input', (e) => { debouncedSearch(e.target.value, e.target); });
+    document.getElementById('catFilter').addEventListener('change', (e) => { cat = e.target.value; updateList(); });
     document.getElementById('notes').addEventListener('input', (e) => { notes = e.target.value; });
 
     document.getElementById('btnDraft').addEventListener('click', () => saveDraft(order));

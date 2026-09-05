@@ -36,10 +36,19 @@ export function toast(message, type) {
 
 /* ---------- modal ---------- */
 const modalRoot = () => document.getElementById('modal-root');
+let modalPrevFocus = null;
+let modalEscHandler = null;
+let modalTrapHandler = null;
+
+function modalFocusables(node) {
+  return Array.from(node.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'))
+    .filter((n) => n.offsetParent !== null || n === document.activeElement);
+}
 
 export function openModal({ title, body, footer }) {
   const root = modalRoot();
-  closeModal();
+  closeModal(true);
+  modalPrevFocus = document.activeElement;
   const node = el(
     '<div class="modal-backdrop">' +
     '<div class="modal" role="dialog" aria-modal="true" aria-label="' + esc(title || '') + '">' +
@@ -50,20 +59,37 @@ export function openModal({ title, body, footer }) {
     '</div></div>'
   );
   const focusables = 'button, input, select, textarea, [tabindex]';
-  node.querySelector('[data-close]').addEventListener('click', () => root.innerHTML = '');
+  node.querySelector('[data-close]').addEventListener('click', () => closeModal());
   node.addEventListener('click', (e) => {
-    if (e.target === node) root.innerHTML = '';
+    if (e.target === node) closeModal();
   });
-  node.querySelectorAll(focusables);
+  modalEscHandler = (e) => { if (e.key === 'Escape') closeModal(); };
+  document.addEventListener('keydown', modalEscHandler);
+  modalTrapHandler = (e) => {
+    if (e.key !== 'Tab') return;
+    const items = modalFocusables(node);
+    if (!items.length) return;
+    const first = items[0];
+    const last = items[items.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  };
+  node.addEventListener('keydown', modalTrapHandler);
   root.appendChild(node);
   const first = node.querySelector(focusables);
   if (first) first.focus();
   return node;
 }
 
-export function closeModal() {
+export function closeModal(silent) {
   const root = modalRoot();
   if (root) root.innerHTML = '';
+  if (modalEscHandler) { document.removeEventListener('keydown', modalEscHandler); modalEscHandler = null; }
+  modalTrapHandler = null;
+  if (!silent && modalPrevFocus && document.contains(modalPrevFocus)) {
+    try { modalPrevFocus.focus(); } catch (e) { /* ignore */ }
+  }
+  modalPrevFocus = null;
 }
 
 export function confirmDialog({ title, message, confirmLabel, danger, cancelLabel }) {
@@ -117,9 +143,9 @@ export function skeletons(count, lines) {
 export function qtyControl(value, max) {
   const stepper =
     '<div class="qty">' +
-    '<button type="button" class="qty-btn" data-q="-1" aria-label="decrease">' + icon('minus', 14) + '</button>' +
-    '<input class="qty-val" type="number" inputmode="decimal" min="0" step="any" value="' + esc(value || '') + '" aria-label="quantity">' +
-    '<button type="button" class="qty-btn" data-q="1" aria-label="increase">' + icon('plus', 14) + '</button>' +
+    '<button type="button" class="qty-btn" data-q="-1" aria-label="' + esc(t('a11y.decrease')) + '">' + icon('minus', 14) + '</button>' +
+    '<input class="qty-val" type="number" inputmode="decimal" min="0" step="any" value="' + esc(value || '') + '" aria-label="' + esc(t('a11y.quantity')) + '">' +
+    '<button type="button" class="qty-btn" data-q="1" aria-label="' + esc(t('a11y.increase')) + '">' + icon('plus', 14) + '</button>' +
     '</div>';
   return stepper;
 }
