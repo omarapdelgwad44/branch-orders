@@ -511,6 +511,9 @@ tr.av-off .badge.av-tag { display: inline-flex; }
 .modal-body { padding: 18px 20px; min-width: 0; }
 .modal-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 20px 18px; border-top: 1px solid var(--line-soft); flex-wrap: wrap; }
 .modal-msg { color: var(--muted); margin: 0 0 14px; font-size: .92rem; }
+.import-errors { margin: 0; padding-inline-start: 22px; display: grid; gap: 7px; }
+.import-errors li { font-size: .9rem; color: var(--ink); overflow-wrap: anywhere; }
+.import-errors li b { color: var(--danger); }
 
 @keyframes fade { from { opacity: 0; } }
 @keyframes pop { from { opacity: 0; transform: translateY(12px) scale(.98); } }

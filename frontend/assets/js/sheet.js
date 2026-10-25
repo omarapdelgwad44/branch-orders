@@ -3,6 +3,9 @@
  * and reads CSV that Excel exports. No third-party library.
  */
 
+const NS_PREFIX = '(?:[A-Za-z_][\\w.-]*:)?';
+function nsTag(name) { return NS_PREFIX + name; }
+
 const SHEETS = {
   items: {
     headers: ['كود الصنف', 'اسم الصنف', 'التصنيف', 'الوحدة', 'الترتيب', 'نشط'],
@@ -148,12 +151,13 @@ function colIndex(ref) {
 
 function sharedStrings(xml) {
   const out = [];
-  const blocks = String(xml).split(/<si[\s>]/).slice(1);
+  const blocks = String(xml).split(new RegExp('<' + nsTag('si') + '[\\s>]')).slice(1);
+  const textRe = new RegExp('<' + nsTag('t') + '\\b[^>]*>([\\s\\S]*?)<\\/' + nsTag('t') + '>', 'g');
   blocks.forEach((block) => {
     const texts = [];
-    const re = /<t[^>]*>([\s\S]*?)<\/t>/g;
     let m;
-    while ((m = re.exec(block))) texts.push(decodeXml(m[1]));
+    textRe.lastIndex = 0;
+    while ((m = textRe.exec(block))) texts.push(decodeXml(m[1]));
     out.push(texts.join(''));
   });
   return out;
@@ -162,26 +166,39 @@ function sharedStrings(xml) {
 function sheetRows(xml, shared) {
   const src = String(xml);
   const rows = [];
-  const rowRe = /<row\b[^>]*>([\s\S]*?)<\/row>/g;
+  const rowRe = new RegExp('<' + nsTag('row') + '\\b[^>]*>([\\s\\S]*?)<\\/' + nsTag('row') + '>', 'g');
+  const cellOpenRe = new RegExp('<' + nsTag('c') + '\\b([^>]*?)(\\/?)>', 'g');
+  const cellCloseRe = new RegExp('<\\/' + nsTag('c') + '>', 'g');
+  const valueRe = new RegExp('<' + nsTag('v') + '\\b[^>]*>([\\s\\S]*?)<\\/' + nsTag('v') + '>');
+  const textRe = new RegExp('<' + nsTag('t') + '\\b[^>]*>([\\s\\S]*?)<\\/' + nsTag('t') + '>', 'g');
   let rm;
   while ((rm = rowRe.exec(src))) {
+    const inner = rm[1];
     const cells = [];
-    const cellRe = /<c\b([^>]*)>([\s\S]*?)<\/c>|<c\b([^>]*)\/>/g;
+    cellOpenRe.lastIndex = 0;
     let cm;
-    while ((cm = cellRe.exec(rm[1]))) {
-      const attrs = cm[1] || cm[3] || '';
-      const body = cm[2] || '';
+    while ((cm = cellOpenRe.exec(inner))) {
+      const attrs = cm[1] || '';
+      const selfClosing = cm[2] === '/';
+      let body = '';
+      if (!selfClosing) {
+        cellCloseRe.lastIndex = cellOpenRe.lastIndex;
+        const close = cellCloseRe.exec(inner);
+        if (!close) break;
+        body = inner.slice(cellOpenRe.lastIndex, close.index);
+        cellOpenRe.lastIndex = cellCloseRe.lastIndex;
+      }
       const ref = (attrs.match(/\br="([^"]+)"/) || [])[1] || '';
       const type = (attrs.match(/\bt="([^"]+)"/) || [])[1] || '';
       let value = '';
       if (type === 'inlineStr') {
         const texts = [];
-        const re = /<t[^>]*>([\s\S]*?)<\/t>/g;
         let tm;
-        while ((tm = re.exec(body))) texts.push(decodeXml(tm[1]));
+        textRe.lastIndex = 0;
+        while ((tm = textRe.exec(body))) texts.push(decodeXml(tm[1]));
         value = texts.join('');
       } else {
-        const v = (body.match(/<v[^>]*>([\s\S]*?)<\/v>/) || [])[1];
+        const v = (body.match(valueRe) || [])[1];
         value = v == null ? '' : decodeXml(v);
         if (type === 's') value = shared[parseInt(value, 10)] || '';
       }

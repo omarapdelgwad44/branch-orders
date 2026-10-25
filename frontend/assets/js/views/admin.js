@@ -83,10 +83,41 @@ function bindSheetImport(opts) {
       if (!rows.length) { toast(t('manage.importEmpty'), 'error'); return; }
       const res = await api(opts.action, { rows });
       toast(t('manage.importDone', { created: res.created, updated: res.updated }), 'success');
-      if (res.errors && res.errors.length) toast(t('manage.importErrors', { n: res.errors.length }), 'error');
+      if (res.errors && res.errors.length) openImportErrors(res.errors);
       opts.reload();
     } catch (e) { toast(errorText(e), 'error'); }
   });
+}
+
+function importErrorMessage(message) {
+  const map = {
+    'Branch was not found.': t('manage.errBranchNotFound'),
+    'Password must be at least 6 characters.': t('manage.errPassword'),
+    'Username is required.': t('manage.errUsername'),
+    'This username is already taken.': t('manage.errUsernameTaken'),
+    'Invalid role.': t('manage.errRole'),
+    'Invalid branch.': t('manage.errBranch'),
+    'A branch is required for branch users.': t('manage.errBranchRequired')
+  };
+  return map[message] || message;
+}
+
+function openImportErrors(errors) {
+  const rows = errors.slice(0, 50).map((e) =>
+    '<li><b>' + esc(t('manage.importErrorRow', { row: e.row })) + '</b> ' +
+    esc(importErrorMessage(e.message)) + '</li>'
+  ).join('');
+  const more = errors.length > 50
+    ? '<p class="modal-msg">' + esc(t('manage.importErrors', { n: errors.length - 50 })) + '</p>'
+    : '';
+  const node = openModal({
+    title: t('manage.importErrorTitle'),
+    body: '<p class="modal-msg">' + esc(t('manage.importErrorHint')) + '</p>' +
+      '<ul class="import-errors">' + rows + '</ul>' + more,
+    footer: ''
+  });
+  node.querySelector('.modal-foot').innerHTML = '<button class="btn btn-primary" data-ok>' + esc(t('common.close')) + '</button>';
+  node.querySelector('[data-ok]').addEventListener('click', closeModal);
 }
 
 /* ================= dashboard ================= */
