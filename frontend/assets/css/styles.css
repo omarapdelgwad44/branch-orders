@@ -204,10 +204,10 @@ tr.av-off td { color: var(--muted); }
 }
 .brand-mark.light { background: linear-gradient(135deg, #f5b56b, var(--accent)); color: #3b2100; }
 .brand-logo {
-  width: 42px; height: 42px; flex: none; object-fit: contain;
+  width: 50px; height: 50px; flex: none; object-fit: contain;
   border-radius: 12px;
 }
-.brand-text { display: grid; line-height: 1.25; }
+.brand-text { display: grid; row-gap: 6px; line-height: 1.25; }
 .brand-text b { color: #fff; font-size: .95rem; }
 .brand-text em { color: #b8d5e7; font-style: normal; font-size: .74rem; }
 
@@ -243,11 +243,11 @@ tr.av-off td { color: var(--muted); }
 
 /* ============ SDG identity ============ */
 .hero-brand-logo {
-  width: 77px; height: 77px; object-fit: contain; flex: none;
-  border-radius: 18px;
+  width: auto; height: clamp(108px, 12vh, 140px); max-width: 100%;
+  object-fit: contain; flex: none; background: transparent;
 }
 .login-hero .hero-brand { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
-.login-hero .brand-text { justify-items: start; row-gap: 6px; }
+.login-hero .brand-text { justify-items: start; }
 .login-hero .brand-text b {
   width: fit-content; padding: 4px 9px; border-radius: 8px;
   color: #123c56; background: #f28b23; font-size: .82rem; line-height: 1.35;
@@ -688,7 +688,7 @@ tr.av-off .badge.av-tag { display: inline-flex; }
   .chip-btn.chip-badge.active { border-color: transparent; background: transparent; }
   .chip-btn.chip-badge.active .badge { outline: 2px solid var(--primary); outline-offset: 2px; }
   .hero-inner { padding: 22px; }
-  .hero-brand-logo { width: 62px; height: 62px; }
+  .hero-brand-logo { width: auto; height: 96px; max-width: 100%; }
   .login-steps { gap: .3em; font-size: 1.55rem; }
   #toast-root { top: auto; bottom: 16px; inset-inline-end: 12px; inset-inline-start: 12px; width: auto; }
 }

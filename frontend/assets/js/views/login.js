@@ -28,7 +28,7 @@ function layout() {
       '<div class="hero-grid"></div>' +
       '<div class="hero-inner">' +
         '<div class="hero-brand">' +
-          '<img class="hero-brand-logo" src="assets/images/sdg-logo-official.png" alt="SDG — Smart Distribution Group" width="720" height="988" fetchpriority="high">' +
+          '<img class="hero-brand-logo" src="assets/images/sdg-logo-full-transparent.png" alt="SDG — Smart Distribution Group" width="696" height="955" fetchpriority="high">' +
           '<span class="brand-text"><b>' + esc(t('app.name')) + '</b><em>' + esc(t('app.tagline')) + '</em></span>' +
         '</div>' +
         '<div class="hero-copy">' +

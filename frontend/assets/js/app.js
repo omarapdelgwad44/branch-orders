@@ -86,7 +86,7 @@ function renderShell(user) {
     '<div class="backdrop" id="backdrop"></div>' +
     '<aside class="sidebar" id="sidebar" aria-label="' + escNav(t('app.name')) + '">' +
       '<div class="brand">' +
-        '<img class="brand-logo" src="assets/images/sdg-mark-transparent.png" alt="SDG" width="256" height="256">' +
+        '<img class="brand-logo" src="assets/images/sdg-emblem-official.png" alt="SDG" width="922" height="922">' +
         '<span class="brand-text"><b>' + escNav(t('app.name')) + '</b><em>' + escNav(t('app.tagline')) + '</em></span>' +
       '</div>' +
       '<nav class="nav" aria-label="' + escNav(t('app.name')) + '">' + navItems + '</nav>' +
