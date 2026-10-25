@@ -1,5 +1,13 @@
 import { fail, hashPassword, USER_ROLES, USER_STATUS } from './lib.mjs';
 
+function publicUser(row) {
+  if (!row) return row;
+  const out = Object.assign({}, row);
+  delete out.password_hash;
+  delete out.password_salt;
+  return out;
+}
+
 export function createCatalog(store, cfg, ids, activity, auth) {
   const Users = {
     async list() {
@@ -34,7 +42,7 @@ export function createCatalog(store, cfg, ids, activity, auth) {
       const dup = (await store.all('Users')).filter((r) => String(r.username).toLowerCase() === username.toLowerCase());
       if (dup.length) fail('validation', 'This username is already taken.');
       const id = await ids.userId();
-      return store.insert('Users', {
+      const rec = await store.insert('Users', {
         user_id: id,
         username,
         email: String(payload.email || '').trim(),
@@ -48,6 +56,7 @@ export function createCatalog(store, cfg, ids, activity, auth) {
         updated_at: await cfg.now(),
         last_login_at: ''
       });
+      return publicUser(rec);
     },
 
     async update(userId, payload) {
@@ -92,7 +101,7 @@ export function createCatalog(store, cfg, ids, activity, auth) {
       }
       const updated = await store.update('Users', row, patch);
       await activity.log(null, 'user_updated', 'user', userId, { role: patch.role || row.role });
-      return updated;
+      return publicUser(updated);
     }
   };
 

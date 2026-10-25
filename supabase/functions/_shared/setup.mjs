@@ -77,6 +77,9 @@ export function createSetup(store, cfg, ids, activity, auth) {
   }
 
   async function loadDemoData() {
+    if ((await store.all('Branches')).length > 0 || (await store.all('Orders')).length > 0) {
+      fail('demo_exists', 'Demo data cannot be loaded after branches or orders exist.');
+    }
     if ((await store.getSetting('DEMO_LOADED', 'false')) === 'true') {
       fail('demo_exists', 'Demo data has already been loaded.');
     }

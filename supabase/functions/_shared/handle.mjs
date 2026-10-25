@@ -13,13 +13,6 @@ import { createOrders } from './orders.mjs';
 import { createReports, createActivity } from './reports.mjs';
 import { createSetup } from './setup.mjs';
 
-function safeCause(err) {
-  return String((err && err.message) || err || '')
-    .replace(/sb_secret_[A-Za-z0-9_-]+/g, 'sb_secret_[redacted]')
-    .replace(/eyJ[A-Za-z0-9_-]{10,}/g, '[jwt]')
-    .slice(0, 300);
-}
-
 export function createApp(store) {
   const cfg = createConfig(store);
   const ids = createIds(store);
@@ -147,14 +140,7 @@ export function createApp(store) {
         return { ok: false, error: { code: err.code, message: err.message, details: err.details } };
       }
       console.error('ERROR action=' + action, err && err.stack ? err.stack : err);
-      return {
-        ok: false,
-        error: {
-          code: 'internal_error',
-          message: 'Something went wrong. Please try again.',
-          details: { cause: safeCause(err) }
-        }
-      };
+      return { ok: false, error: { code: 'internal_error', message: 'Something went wrong. Please try again.' } };
     }
   }
 
