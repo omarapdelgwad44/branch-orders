@@ -179,6 +179,15 @@ export function debounce(fn, ms) {
 
 export function fileDownload(name, content, mime) {
   const blob = new Blob(['\uFEFF' + content], { type: (mime || 'text/csv') + ';charset=utf-8;' });
+  triggerDownload(name, blob);
+}
+
+export function downloadBytes(name, bytes, mime) {
+  const blob = new Blob([bytes], { type: mime || 'application/octet-stream' });
+  triggerDownload(name, blob);
+}
+
+function triggerDownload(name, blob) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

@@ -5,7 +5,8 @@
 import { t, fmtDate, fmtNum, errorText } from '../i18n.js';
 import { api } from '../api.js';
 import { icon } from '../icons.js';
-import { badge, skeletons, qtyControl, attachQty, toast, confirmDialog, openModal, closeModal, numberCell, esc, fileDownload, debounce, STATUS_TYPES } from '../ui.js';
+import { badge, skeletons, qtyControl, attachQty, toast, confirmDialog, openModal, closeModal, numberCell, esc, fileDownload, downloadBytes, debounce, STATUS_TYPES } from '../ui.js';
+import { itemsTemplate, readTable, tableFromCsv, rowsToItems } from '../sheet.js';
 import { reportButtonsHtml, bindReportButtons } from '../report.js';
 
 let branchesCache = [];
@@ -36,6 +37,22 @@ function header(title, sub, extra) {
 
 function emptyState(msg) {
   return '<div class="state"><h2>' + esc(msg || t('msg.error')) + '</h2></div>';
+}
+
+function rowActions(id) {
+  return '<td class="row-actions">' +
+    '<button class="btn btn-ghost btn-sm" type="button" data-edit="' + esc(id) + '">' + icon('edit', 14) + '</button>' +
+    '<button class="btn btn-ghost btn-sm icon-danger" type="button" data-del="' + esc(id) + '" aria-label="' + esc(t('common.delete')) + '">' + icon('trash', 14) + '</button>' +
+    '</td>';
+}
+
+async function askDelete(name) {
+  return confirmDialog({
+    title: t('common.delete'),
+    message: t('manage.deleteAsk', { name: name }),
+    confirmLabel: t('common.delete'),
+    danger: true
+  });
 }
 
 /* ================= dashboard ================= */
@@ -382,13 +399,23 @@ async function manageBranches(view) {
       '</tr></thead><tbody>' +
       data.branches.map(b => '<tr><td><b class="mono">' + esc(b.branch_code) + '</b></td><td>' + esc(b.branch_name) + '</td><td>' + esc(b.location || '') + '</td>' +
         '<td><span class="badge ' + (b.status === 'active' ? 'badge-green' : 'badge-gray') + '">' + esc(t(b.status === 'active' ? 'manage.active' : 'manage.inactive')) + '</span></td>' +
-        '<td><button class="btn btn-ghost btn-sm" data-edit="' + esc(b.branch_id) + '">' + icon('edit', 14) + '</button></td></tr>').join('') +
+        rowActions(b.branch_id) + '</tr>').join('') +
       '</tbody></table></div></div>';
 
     document.getElementById('addBranch').addEventListener('click', () => branchForm(null));
     view.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => {
       const b = data.branches.filter(x => x.branch_id === btn.dataset.edit)[0];
       branchForm(b);
+    }));
+    view.querySelectorAll('[data-del]').forEach(btn => btn.addEventListener('click', async () => {
+      const b = data.branches.filter(x => x.branch_id === btn.dataset.del)[0];
+      if (!b || !(await askDelete(b.branch_name))) return;
+      try {
+        await api('admin.branches.delete', { branch_id: b.branch_id });
+        branchesCache = [];
+        toast(t('manage.deleted'), 'success');
+        manageBranches(view);
+      } catch (e) { toast(errorText(e), 'error'); }
     }));
     function branchForm(b) {
       const node = openModal({ title: b ? b.branch_name : t('manage.newBranch'), body: form(b), footer: '' });
@@ -440,12 +467,21 @@ async function manageUsers(view, ctx) {
         '<td>' + (u.role === 'admin' ? esc(t('manage.roleAdmin')) : esc(t('manage.roleBranch'))) + '</td>' +
         '<td>' + esc(u.branch_name || t('common.none')) + '</td>' +
         '<td><span class="badge ' + (u.status === 'active' ? 'badge-green' : 'badge-gray') + '">' + esc(t(u.status === 'active' ? 'manage.active' : 'manage.inactive')) + '</span></td>' +
-        '<td><button class="btn btn-ghost btn-sm" data-edit="' + esc(u.user_id) + '">' + icon('edit', 14) + '</button></td></tr>').join('') +
+        rowActions(u.user_id) + '</tr>').join('') +
       '</tbody></table></div></div>';
 
     document.getElementById('addUser').addEventListener('click', () => userForm(null));
     view.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => {
       userForm(du.users.filter(x => x.user_id === btn.dataset.edit)[0]);
+    }));
+    view.querySelectorAll('[data-del]').forEach(btn => btn.addEventListener('click', async () => {
+      const u = du.users.filter(x => x.user_id === btn.dataset.del)[0];
+      if (!u || !(await askDelete(u.full_name || u.username))) return;
+      try {
+        await api('admin.users.delete', { user_id: u.user_id });
+        toast(t('manage.deleted'), 'success');
+        manageUsers(view, ctx);
+      } catch (e) { toast(errorText(e), 'error'); }
     }));
     function userForm(u) {
       const v = u || {};
@@ -498,7 +534,12 @@ async function manageItems(view, ctx) {
   try {
     const data = await api('admin.items.list');
     const cats = [...new Set(data.items.map(i => i.category).filter(Boolean))].sort();
-    view.innerHTML = header(t('manage.items'), '', '<button class="btn btn-primary" id="addItem">' + icon('plus', 15) + ' ' + esc(t('manage.newItem')) + '</button>') +
+    const tools = '<div class="page-actions">' +
+      '<button class="btn btn-ghost" id="dlTemplate" type="button">' + icon('download', 15) + ' ' + esc(t('manage.template')) + '</button>' +
+      '<button class="btn btn-ghost" id="importItems" type="button">' + icon('upload', 15) + ' ' + esc(t('manage.import')) + '</button>' +
+      '<input id="importFile" type="file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden>' +
+      '<button class="btn btn-primary" id="addItem" type="button">' + icon('plus', 15) + ' ' + esc(t('manage.newItem')) + '</button></div>';
+    view.innerHTML = header(t('manage.items'), '', tools) +
       '<div class="card"><div class="table-wrap"><table class="tbl"><thead><tr>' +
       ['manage.itemCode', 'manage.itemName', 'order.category', 'manage.unit', 'manage.sort', 'common.actions'].map(k => '<th>' + esc(t(k)) + '</th>').join('') + '<th></th>' +
       '</tr></thead><tbody>' +
@@ -506,12 +547,44 @@ async function manageItems(view, ctx) {
         '<tr><td><b class="mono">' + esc(i.item_code || '') + '</b></td><td>' + esc(i.item_name) + '</td><td>' + esc(i.category || t('common.none')) + '</td>' +
         '<td>' + esc(i.unit) + '</td><td>' + (i.sort_order || 0) + '</td>' +
         '<td><span class="badge ' + (i.active ? 'badge-green' : 'badge-gray') + '">' + esc(t(i.active ? 'manage.active' : 'manage.inactive')) + '</span></td>' +
-        '<td><button class="btn btn-ghost btn-sm" data-edit="' + esc(i.item_id) + '">' + icon('edit', 14) + '</button></td></tr>').join('') +
+        rowActions(i.item_id) + '</tr>').join('') +
       '</tbody></table></div></div>';
 
     document.getElementById('addItem').addEventListener('click', () => itemForm(null));
+    document.getElementById('dlTemplate').addEventListener('click', () => {
+      downloadBytes('قالب-الأصناف.xlsx', itemsTemplate(), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    });
+    document.getElementById('importItems').addEventListener('click', () => document.getElementById('importFile').click());
+    document.getElementById('importFile').addEventListener('change', async (ev) => {
+      const file = ev.target.files && ev.target.files[0];
+      ev.target.value = '';
+      if (!file) return;
+      try {
+        const buf = await file.arrayBuffer();
+        const lower = file.name.toLowerCase();
+        const matrix = lower.endsWith('.csv')
+          ? tableFromCsv(new TextDecoder('utf-8').decode(buf))
+          : await readTable(buf);
+        const rows = rowsToItems(matrix);
+        if (!rows) { toast(t('manage.importBad'), 'error'); return; }
+        if (!rows.length) { toast(t('manage.importEmpty'), 'error'); return; }
+        const res = await api('admin.items.import', { rows });
+        toast(t('manage.importDone', { created: res.created, updated: res.updated }), 'success');
+        if (res.errors && res.errors.length) toast(t('manage.importErrors', { n: res.errors.length }), 'error');
+        manageItems(view, ctx);
+      } catch (e) { toast(errorText(e), 'error'); }
+    });
     view.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => {
       itemForm(data.items.filter(i => i.item_id === btn.dataset.edit)[0]);
+    }));
+    view.querySelectorAll('[data-del]').forEach(btn => btn.addEventListener('click', async () => {
+      const item = data.items.filter(i => i.item_id === btn.dataset.del)[0];
+      if (!item || !(await askDelete(item.item_name))) return;
+      try {
+        await api('admin.items.delete', { item_id: item.item_id });
+        toast(t('manage.deleted'), 'success');
+        manageItems(view, ctx);
+      } catch (e) { toast(errorText(e), 'error'); }
     }));
     function itemForm(i) {
       const v = i || {};

@@ -90,6 +90,11 @@ export function createSupabaseStore(client) {
       throwSb(error, 'insert ' + name);
       return nullToEmpty(data);
     },
+    async remove(name, col, val) {
+      const { error, count } = await client.from(table(name)).delete({ count: 'exact' }).eq(col, val);
+      throwSb(error, 'remove ' + name);
+      return count || 0;
+    },
     async update(name, row, patch) {
       const payload = emptyToNull(patch);
       if (name === 'Branch_Items') {

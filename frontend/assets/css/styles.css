@@ -242,6 +242,9 @@ tr.av-off td { color: var(--muted); }
 .page-head > div { min-width: 0; }
 .page-head h2 { overflow-wrap: anywhere; }
 .page-head .btn { flex: none; }
+.page-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.row-actions { display: flex; gap: 4px; white-space: nowrap; }
+.icon-danger { color: var(--danger); }
 .page-sub { margin: 6px 0 0; color: var(--muted); font-size: .92rem; }
 
 .card {
