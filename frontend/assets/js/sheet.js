@@ -3,46 +3,80 @@
  * and reads CSV that Excel exports. No third-party library.
  */
 
-const TEMPLATE_HEADERS = ['كود الصنف', 'اسم الصنف', 'التصنيف', 'الوحدة', 'الترتيب', 'نشط'];
-const TEMPLATE_EXAMPLE = ['EXAMPLE', 'مثال - احذف هذا السطر', 'مشروبات', 'علبة', '1', 'نعم'];
-
-const FIELD_NAMES = {
-  item_code: ['كود الصنف', 'كود', 'item_code', 'code'],
-  item_name: ['اسم الصنف', 'الصنف', 'item_name', 'name'],
-  category: ['التصنيف', 'الفئة', 'category'],
-  unit: ['الوحدة', 'unit'],
-  sort_order: ['الترتيب', 'sort_order', 'sort'],
-  active: ['نشط', 'الحالة', 'active', 'status']
+const SHEETS = {
+  items: {
+    headers: ['كود الصنف', 'اسم الصنف', 'التصنيف', 'الوحدة', 'الترتيب', 'نشط'],
+    example: ['EXAMPLE', 'مثال - احذف هذا السطر', 'مشروبات', 'علبة', '1', 'نعم'],
+    fields: {
+      item_code: ['كود الصنف', 'كود', 'item_code', 'code'],
+      item_name: ['اسم الصنف', 'الصنف', 'item_name', 'name'],
+      category: ['التصنيف', 'الفئة', 'category'],
+      unit: ['الوحدة', 'unit'],
+      sort_order: ['الترتيب', 'sort_order', 'sort'],
+      active: ['نشط', 'الحالة', 'active', 'status']
+    },
+    required: ['item_name', 'item_code']
+  },
+  branches: {
+    headers: ['كود الفرع', 'اسم الفرع', 'الموقع', 'الحالة'],
+    example: ['EXAMPLE', 'مثال - احذف هذا السطر', 'القاهرة', 'نشط'],
+    fields: {
+      branch_code: ['كود الفرع', 'كود', 'branch_code', 'code'],
+      branch_name: ['اسم الفرع', 'الفرع', 'branch_name', 'name'],
+      location: ['الموقع', 'location'],
+      status: ['الحالة', 'نشط', 'status']
+    },
+    required: ['branch_name', 'branch_code']
+  },
+  users: {
+    headers: ['الاسم الكامل', 'اسم المستخدم', 'البريد', 'كلمة المرور', 'الدور', 'الفرع', 'الحالة'],
+    example: ['مثال - احذف هذا السطر', 'EXAMPLE', '', 'Pass@123', 'مستخدم فرع', 'CAIRO-1', 'نشط'],
+    fields: {
+      full_name: ['الاسم الكامل', 'الاسم', 'full_name', 'name'],
+      username: ['اسم المستخدم', 'المستخدم', 'username', 'user'],
+      email: ['البريد', 'البريد الإلكتروني', 'email'],
+      password: ['كلمة المرور', 'كلمة السر', 'password'],
+      role: ['الدور', 'role'],
+      branch: ['الفرع', 'branch'],
+      status: ['الحالة', 'status']
+    },
+    required: ['username']
+  }
 };
 
-export function itemsTemplate() {
-  return buildXlsx([TEMPLATE_HEADERS, TEMPLATE_EXAMPLE]);
+export function itemsTemplate() { return templateFor('items'); }
+export function branchesTemplate() { return templateFor('branches'); }
+export function usersTemplate() { return templateFor('users'); }
+
+export function rowsToItems(matrix) { return mapSheet(matrix, 'items'); }
+export function rowsToBranches(matrix) { return mapSheet(matrix, 'branches'); }
+export function rowsToUsers(matrix) { return mapSheet(matrix, 'users'); }
+
+function templateFor(kind) {
+  const spec = SHEETS[kind];
+  return buildXlsx([spec.headers, spec.example]);
 }
 
-export function rowsToItems(matrix) {
+function mapSheet(matrix, kind) {
+  const spec = SHEETS[kind];
   if (!matrix || !matrix.length) return null;
   const header = matrix[0].map((h) => String(h || '').trim().toLowerCase());
   const index = {};
-  Object.keys(FIELD_NAMES).forEach((field) => {
-    const names = FIELD_NAMES[field].map((n) => n.toLowerCase());
+  Object.keys(spec.fields).forEach((field) => {
+    const names = spec.fields[field].map((n) => n.toLowerCase());
     const at = header.findIndex((h) => names.indexOf(h) !== -1);
     if (at >= 0) index[field] = at;
   });
-  if (index.item_name === undefined && index.item_code === undefined) return null;
+  if (!spec.required.some((field) => index[field] !== undefined)) return null;
   const out = [];
   for (let r = 1; r < matrix.length; r++) {
     const line = matrix[r] || [];
     if (line.every((c) => !String(c || '').trim())) continue;
-    const get = (field) => (index[field] === undefined ? '' : line[index[field]]);
-    out.push({
-      row: r + 1,
-      item_code: String(get('item_code') || '').trim(),
-      item_name: String(get('item_name') || '').trim(),
-      category: String(get('category') || '').trim(),
-      unit: String(get('unit') || '').trim(),
-      sort_order: get('sort_order'),
-      active: get('active')
+    const row = { row: r + 1 };
+    Object.keys(spec.fields).forEach((field) => {
+      row[field] = index[field] === undefined ? '' : String(line[index[field]] == null ? '' : line[index[field]]).trim();
     });
+    out.push(row);
   }
   return out;
 }

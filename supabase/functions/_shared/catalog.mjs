@@ -9,9 +9,27 @@ function publicUser(row) {
 }
 
 function parseActive(value) {
+  return parseStatus(value) === USER_STATUS.ACTIVE;
+}
+
+function parseStatus(value) {
   const s = String(value == null ? '' : value).trim().toLowerCase();
-  if (!s) return true;
-  return ['0', 'false', 'no', 'n', 'لا', 'غير نشط', 'inactive'].indexOf(s) === -1;
+  if (['0', 'false', 'no', 'n', 'لا', 'غير نشط', 'inactive'].indexOf(s) !== -1) return USER_STATUS.INACTIVE;
+  return USER_STATUS.ACTIVE;
+}
+
+function parseRole(value) {
+  const s = String(value || '').trim().toLowerCase();
+  if (['admin', 'مدير', 'مدير نظام', 'مسؤول'].indexOf(s) !== -1) return USER_ROLES.ADMIN;
+  return USER_ROLES.BRANCH_USER;
+}
+
+function findBranch(branches, label) {
+  const s = String(label || '').trim().toLowerCase();
+  if (!s) return null;
+  return branches.find((b) =>
+    String(b.branch_code || '').toLowerCase() === s || String(b.branch_name || '').toLowerCase() === s
+  ) || null;
 }
 
 export function createCatalog(store, cfg, ids, activity, auth) {
@@ -128,6 +146,67 @@ export function createCatalog(store, cfg, ids, activity, auth) {
       await store.remove('Users', 'user_id', userId);
       await activity.log(actor && actor.user_id, 'user_deleted', 'user', userId, { username: row.username });
       return { ok: true };
+    },
+    async importRows(rows) {
+      if (!Array.isArray(rows) || !rows.length) fail('validation', 'The file has no rows to import.');
+      const existing = await store.all('Users');
+      const branchList = await store.all('Branches');
+      let created = 0;
+      let updated = 0;
+      let skipped = 0;
+      const errors = [];
+      for (let i = 0; i < rows.length; i++) {
+        const raw = rows[i] || {};
+        const username = String(raw.username || '').trim();
+        const rowNo = parseInt(raw.row, 10) || (i + 2);
+        if (!username && !String(raw.full_name || '').trim()) { skipped++; continue; }
+        if (username.toUpperCase() === 'EXAMPLE') { skipped++; continue; }
+        if (!username) {
+          errors.push({ row: rowNo, message: 'Username is required.' });
+          continue;
+        }
+        const role = parseRole(raw.role);
+        const branch = findBranch(branchList, raw.branch);
+        if (role === USER_ROLES.BRANCH_USER && !branch) {
+          errors.push({ row: rowNo, message: 'Branch was not found.' });
+          continue;
+        }
+        const hit = existing.find((u) => String(u.username || '').toLowerCase() === username.toLowerCase());
+        const password = String(raw.password || '');
+        try {
+          if (hit) {
+            const payload = {
+              full_name: String(raw.full_name || hit.full_name || '').trim(),
+              email: String(raw.email || '').trim(),
+              role,
+              branch_id: role === USER_ROLES.BRANCH_USER ? branch.branch_id : '',
+              status: parseStatus(raw.status)
+            };
+            if (password) payload.new_password = password;
+            await this.update(hit.user_id, payload);
+            updated++;
+          } else {
+            if (password.length < 6) {
+              errors.push({ row: rowNo, message: 'Password must be at least 6 characters.' });
+              continue;
+            }
+            const rec = await this.create({
+              username,
+              password,
+              full_name: String(raw.full_name || username).trim(),
+              email: String(raw.email || '').trim(),
+              role,
+              branch_id: role === USER_ROLES.BRANCH_USER ? branch.branch_id : '',
+              status: parseStatus(raw.status)
+            });
+            existing.push(rec);
+            created++;
+          }
+        } catch (err) {
+          errors.push({ row: rowNo, message: (err && err.message) || 'Invalid row' });
+        }
+      }
+      return { created, updated, skipped, errors };
     }
   };
 
@@ -185,6 +264,49 @@ export function createCatalog(store, cfg, ids, activity, auth) {
       const updated = await store.update('Branches', row, patch);
       await activity.log(null, 'branch_updated', 'branch', branchId, { status: patch.status || '' });
       return updated;
+    },
+    async importRows(rows) {
+      if (!Array.isArray(rows) || !rows.length) fail('validation', 'The file has no rows to import.');
+      const existing = await store.all('Branches');
+      let created = 0;
+      let updated = 0;
+      let skipped = 0;
+      const errors = [];
+      for (let i = 0; i < rows.length; i++) {
+        const raw = rows[i] || {};
+        const code = String(raw.branch_code || '').trim();
+        const name = String(raw.branch_name || '').trim();
+        const rowNo = parseInt(raw.row, 10) || (i + 2);
+        if (!name && !code) { skipped++; continue; }
+        if (code.toUpperCase() === 'EXAMPLE') { skipped++; continue; }
+        if (!name) {
+          errors.push({ row: rowNo, message: 'Branch name is required.' });
+          continue;
+        }
+        const payload = {
+          branch_name: name,
+          location: String(raw.location || '').trim(),
+          status: parseStatus(raw.status)
+        };
+        if (code) payload.branch_code = code;
+        const hit = code
+          ? existing.find((b) => String(b.branch_code || '').toLowerCase() === code.toLowerCase())
+          : null;
+        try {
+          if (hit) {
+            await this.update(hit.branch_id, payload);
+            Object.assign(hit, payload);
+            updated++;
+          } else {
+            const rec = await this.create(payload);
+            existing.push(rec);
+            created++;
+          }
+        } catch (err) {
+          errors.push({ row: rowNo, message: (err && err.message) || 'Invalid row' });
+        }
+      }
+      return { created, updated, skipped, errors };
     },
     async remove(branchId) {
       const row = await store.find('Branches', 'branch_id', branchId);

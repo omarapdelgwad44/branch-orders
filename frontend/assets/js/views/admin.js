@@ -6,7 +6,7 @@ import { t, fmtDate, fmtNum, errorText } from '../i18n.js';
 import { api } from '../api.js';
 import { icon } from '../icons.js';
 import { badge, skeletons, qtyControl, attachQty, toast, confirmDialog, openModal, closeModal, numberCell, esc, fileDownload, downloadBytes, debounce, STATUS_TYPES } from '../ui.js';
-import { itemsTemplate, readTable, tableFromCsv, rowsToItems } from '../sheet.js';
+import { itemsTemplate, branchesTemplate, usersTemplate, readTable, tableFromCsv, rowsToItems, rowsToBranches, rowsToUsers } from '../sheet.js';
 import { reportButtonsHtml, bindReportButtons } from '../report.js';
 
 let branchesCache = [];
@@ -52,6 +52,40 @@ async function askDelete(name) {
     message: t('manage.deleteAsk', { name: name }),
     confirmLabel: t('common.delete'),
     danger: true
+  });
+}
+
+function pageTools(addId, addLabel, ids) {
+  return '<div class="page-actions">' +
+    '<button class="btn btn-ghost" id="' + ids.template + '" type="button">' + icon('download', 15) + ' ' + esc(t('manage.template')) + '</button>' +
+    '<button class="btn btn-ghost" id="' + ids.button + '" type="button">' + icon('upload', 15) + ' ' + esc(t('manage.import')) + '</button>' +
+    '<input id="' + ids.file + '" type="file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden>' +
+    '<button class="btn btn-primary" id="' + addId + '" type="button">' + icon('plus', 15) + ' ' + esc(addLabel) + '</button></div>';
+}
+
+function bindSheetImport(opts) {
+  document.getElementById(opts.templateId).addEventListener('click', () => {
+    downloadBytes(opts.filename, opts.bytes, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  });
+  document.getElementById(opts.buttonId).addEventListener('click', () => document.getElementById(opts.fileId).click());
+  document.getElementById(opts.fileId).addEventListener('change', async (ev) => {
+    const file = ev.target.files && ev.target.files[0];
+    ev.target.value = '';
+    if (!file) return;
+    try {
+      const buf = await file.arrayBuffer();
+      const lower = file.name.toLowerCase();
+      const matrix = lower.endsWith('.csv')
+        ? tableFromCsv(new TextDecoder('utf-8').decode(buf))
+        : await readTable(buf);
+      const rows = opts.mapRows(matrix);
+      if (!rows) { toast(t('manage.importBad'), 'error'); return; }
+      if (!rows.length) { toast(t('manage.importEmpty'), 'error'); return; }
+      const res = await api(opts.action, { rows });
+      toast(t('manage.importDone', { created: res.created, updated: res.updated }), 'success');
+      if (res.errors && res.errors.length) toast(t('manage.importErrors', { n: res.errors.length }), 'error');
+      opts.reload();
+    } catch (e) { toast(errorText(e), 'error'); }
   });
 }
 
@@ -393,7 +427,7 @@ async function manageBranches(view) {
   view.innerHTML = skeletons(1, 4);
   try {
     const data = await api('admin.branches.list');
-    view.innerHTML = header(t('manage.branches'), '', '<button class="btn btn-primary" id="addBranch">' + icon('plus', 15) + ' ' + esc(t('manage.newBranch')) + '</button>') +
+    view.innerHTML = header(t('manage.branches'), '', pageTools('addBranch', t('manage.newBranch'), { template: 'dlBranchTemplate', button: 'importBranches', file: 'importBranchFile' })) +
       '<div class="card"><div class="table-wrap"><table class="tbl"><thead><tr>' +
       ['manage.branchCode', 'manage.branchName', 'manage.location', 'common.actions'].map(k => '<th>' + esc(t(k)) + '</th>').join('') + '<th></th>' +
       '</tr></thead><tbody>' +
@@ -403,6 +437,16 @@ async function manageBranches(view) {
       '</tbody></table></div></div>';
 
     document.getElementById('addBranch').addEventListener('click', () => branchForm(null));
+    bindSheetImport({
+      templateId: 'dlBranchTemplate',
+      buttonId: 'importBranches',
+      fileId: 'importBranchFile',
+      filename: 'قالب-الفروع.xlsx',
+      bytes: branchesTemplate(),
+      mapRows: rowsToBranches,
+      action: 'admin.branches.import',
+      reload: () => { branchesCache = []; manageBranches(view); }
+    });
     view.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => {
       const b = data.branches.filter(x => x.branch_id === btn.dataset.edit)[0];
       branchForm(b);
@@ -459,7 +503,7 @@ async function manageUsers(view, ctx) {
   try {
     const [du, bs] = await Promise.all([api('admin.users.list'), branches()]);
     const noBranches = !bs.length;
-    view.innerHTML = header(t('manage.users'), noBranches ? t('setupError.title') : '', '<button class="btn btn-primary" id="addUser">' + icon('plus', 15) + ' ' + esc(t('manage.newUser')) + '</button>') +
+    view.innerHTML = header(t('manage.users'), noBranches ? t('setupError.title') : '', pageTools('addUser', t('manage.newUser'), { template: 'dlUserTemplate', button: 'importUsers', file: 'importUserFile' })) +
       '<div class="card"><div class="table-wrap"><table class="tbl"><thead><tr>' +
       ['manage.fullName', 'manage.username', 'manage.role', 'manage.branchName', 'common.actions'].map(k => '<th>' + esc(t(k)) + '</th>').join('') + '<th></th>' +
       '</tr></thead><tbody>' +
@@ -471,6 +515,16 @@ async function manageUsers(view, ctx) {
       '</tbody></table></div></div>';
 
     document.getElementById('addUser').addEventListener('click', () => userForm(null));
+    bindSheetImport({
+      templateId: 'dlUserTemplate',
+      buttonId: 'importUsers',
+      fileId: 'importUserFile',
+      filename: 'قالب-المستخدمين.xlsx',
+      bytes: usersTemplate(),
+      mapRows: rowsToUsers,
+      action: 'admin.users.import',
+      reload: () => manageUsers(view, ctx)
+    });
     view.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => {
       userForm(du.users.filter(x => x.user_id === btn.dataset.edit)[0]);
     }));
@@ -534,11 +588,7 @@ async function manageItems(view, ctx) {
   try {
     const data = await api('admin.items.list');
     const cats = [...new Set(data.items.map(i => i.category).filter(Boolean))].sort();
-    const tools = '<div class="page-actions">' +
-      '<button class="btn btn-ghost" id="dlTemplate" type="button">' + icon('download', 15) + ' ' + esc(t('manage.template')) + '</button>' +
-      '<button class="btn btn-ghost" id="importItems" type="button">' + icon('upload', 15) + ' ' + esc(t('manage.import')) + '</button>' +
-      '<input id="importFile" type="file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden>' +
-      '<button class="btn btn-primary" id="addItem" type="button">' + icon('plus', 15) + ' ' + esc(t('manage.newItem')) + '</button></div>';
+    const tools = pageTools('addItem', t('manage.newItem'), { template: 'dlTemplate', button: 'importItems', file: 'importFile' });
     view.innerHTML = header(t('manage.items'), '', tools) +
       '<div class="card"><div class="table-wrap"><table class="tbl"><thead><tr>' +
       ['manage.itemCode', 'manage.itemName', 'order.category', 'manage.unit', 'manage.sort', 'common.actions'].map(k => '<th>' + esc(t(k)) + '</th>').join('') + '<th></th>' +
@@ -551,28 +601,15 @@ async function manageItems(view, ctx) {
       '</tbody></table></div></div>';
 
     document.getElementById('addItem').addEventListener('click', () => itemForm(null));
-    document.getElementById('dlTemplate').addEventListener('click', () => {
-      downloadBytes('قالب-الأصناف.xlsx', itemsTemplate(), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    });
-    document.getElementById('importItems').addEventListener('click', () => document.getElementById('importFile').click());
-    document.getElementById('importFile').addEventListener('change', async (ev) => {
-      const file = ev.target.files && ev.target.files[0];
-      ev.target.value = '';
-      if (!file) return;
-      try {
-        const buf = await file.arrayBuffer();
-        const lower = file.name.toLowerCase();
-        const matrix = lower.endsWith('.csv')
-          ? tableFromCsv(new TextDecoder('utf-8').decode(buf))
-          : await readTable(buf);
-        const rows = rowsToItems(matrix);
-        if (!rows) { toast(t('manage.importBad'), 'error'); return; }
-        if (!rows.length) { toast(t('manage.importEmpty'), 'error'); return; }
-        const res = await api('admin.items.import', { rows });
-        toast(t('manage.importDone', { created: res.created, updated: res.updated }), 'success');
-        if (res.errors && res.errors.length) toast(t('manage.importErrors', { n: res.errors.length }), 'error');
-        manageItems(view, ctx);
-      } catch (e) { toast(errorText(e), 'error'); }
+    bindSheetImport({
+      templateId: 'dlTemplate',
+      buttonId: 'importItems',
+      fileId: 'importFile',
+      filename: 'قالب-الأصناف.xlsx',
+      bytes: itemsTemplate(),
+      mapRows: rowsToItems,
+      action: 'admin.items.import',
+      reload: () => manageItems(view, ctx)
     });
     view.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => {
       itemForm(data.items.filter(i => i.item_id === btn.dataset.edit)[0]);
