@@ -632,7 +632,7 @@ async function reports(view) {
   let bs = [];
   try { bs = await branches(); } catch (e) { /* ignore */ }
   const repFilters = { status: '', branch_id: '', from: '', to: '', search: '' };
-  const kinds = ['orders', 'branches', 'items', 'shortages'];
+  const kinds = ['orders', 'branches', 'items', 'matrix', 'shortages'];
   let current = 'orders';
 
   view.innerHTML = header(t('reports.title'), t('reports.applyFiltersHint')) +
@@ -665,7 +665,7 @@ async function reports(view) {
     try {
       const data = await api('reports.' + current, { filters: repFilters });
       document.getElementById('repTitle').querySelector('h3').textContent = t('reports.' + current);
-      document.getElementById('repBody').innerHTML = tableFor(current, data.rows);
+      document.getElementById('repBody').innerHTML = tableFor(current, data.rows, data.branches || []);
     } catch (e) { document.getElementById('repBody').innerHTML = emptyState(errorText(e)); }
   }
 
@@ -695,7 +695,7 @@ async function reports(view) {
   loadTable();
 }
 
-function tableFor(kind, rows) {
+function tableFor(kind, rows, matrixBranches) {
   const headers = {
     orders: ['order.number', 'order.branch', 'order.status', 'order.createdAt', 'order.sentAt', 'order.receivedAt', 'order.total', 'order.shortage'],
     branches: ['manage.branchName', 'admin.totalOrders', 'admin.drafts', 'admin.submitted', 'admin.sent', 'admin.received', 'admin.shortages', 'dashboard.totalShortage'],
@@ -705,6 +705,24 @@ function tableFor(kind, rows) {
   const h = headers[kind];
   const lowPriority = { 'order.sentAt': 'hide-md', 'order.receivedAt': 'hide-md', 'order.createdAt': 'hide-sm', 'admin.drafts': 'hide-md', 'admin.submitted': 'hide-md', 'order.category': 'hide-sm', 'manage.unit': 'hide-sm', 'order.approved': 'hide-sm', 'order.excess': 'hide-sm' };
   if (!rows.length) return '<div class="empty">' + esc(t('reports.noData')) + '</div>';
+  if (kind === 'matrix') {
+    const branches = matrixBranches || [];
+    const head = ['manage.itemName', 'manage.unit'].map(k => '<th>' + esc(t(k)) + '</th>').join('') +
+      branches.map((b) => '<th class="center">' + esc(b.branch_name) +
+        (b.has_order ? '' : '<div class="sub">' + esc(t('reports.noOrder')) + '</div>') + '</th>').join('') +
+      '<th class="center">' + esc(t('reports.totalRequested')) + '</th>';
+    const body = rows.map((r) => {
+      let total = 0;
+      const cells = branches.map((b) => {
+        const value = Number(r.quantities && r.quantities[b.branch_id]) || 0;
+        total += value;
+        return '<td class="center">' + (b.has_order ? fmtNum(value) : '<span class="muted">—</span>') + '</td>';
+      }).join('');
+      return '<tr><td><b>' + esc(r.item_name) + '</b>' + (r.item_code ? '<div class="sub">' + esc(r.item_code) + '</div>' : '') +
+        '</td><td>' + esc(r.unit) + '</td>' + cells + '<td class="center"><b>' + fmtNum(total) + '</b></td></tr>';
+    }).join('');
+    return '<div class="table-wrap"><table class="tbl"><thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody></table></div>';
+  }
   const render = {
     orders: r => `<tr><td><b class="mono">${esc(r.order_number)}</b></td><td>${esc(r.branch_name)}</td><td>${badge(r.status)}</td><td class="hide-sm">${esc(fmtDate(r.created_at))}</td><td class="hide-md">${esc(fmtDate(r.sent_at))}</td><td class="hide-md">${esc(fmtDate(r.received_at))}</td><td>${numberCell(r.total_requested)}</td><td>${numberCell(r.total_shortage)}</td></tr>`,
     branches: r => `<tr><td><b>${esc(r.branch_name)}</b></td><td class="center">${fmtNum(r.orders)}</td><td class="center hide-md">${fmtNum(r.drafts || 0)}</td><td class="center hide-md">${fmtNum(r.submitted)}</td><td class="center">${fmtNum(r.sent)}</td><td class="center">${fmtNum(r.received)}</td><td class="center">${fmtNum(r.shortage_orders)}</td><td class="center">${fmtNum(r.shortage_total)}</td></tr>`,

@@ -111,6 +111,7 @@ export function createApp(store) {
     'reports.orders': { guard: 'admin', handler: async (body) => ({ rows: await reports.ordersReport(body.filters || {}) }) },
     'reports.branches': { guard: 'admin', handler: async (body) => ({ rows: await reports.branchSummary(body.filters || {}) }) },
     'reports.items': { guard: 'admin', handler: async (body) => ({ rows: await reports.itemDemand(body.filters || {}) }) },
+    'reports.matrix': { guard: 'admin', handler: async (body) => reports.branchOrderMatrix(body.filters || {}) },
     'reports.shortages': { guard: 'admin', handler: async (body) => ({ rows: await reports.shortageReport(body.filters || {}) }) },
     'reports.csv': { guard: 'admin', handler: (body) => reports.csv(String(body.kind || 'orders'), body.filters || {}) },
     'system.setup.firstAdmin': {
