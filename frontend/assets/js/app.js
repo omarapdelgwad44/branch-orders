@@ -208,10 +208,11 @@ function render() {
 
   if (!state.user) {
     app.innerHTML = '';
-    loginView.render(app, { route, onLogin: (session) => {
+    loginView.render(app, { route, onLogin: (session, opts) => {
+      const remember = !opts || opts.remember !== false;
       state.user = session.user;
-      setSessionUser(session.user);
-      setToken(session.token);
+      setSessionUser(session.user, remember);
+      setToken(session.token, remember);
       render();
     } });
     return;

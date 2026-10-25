@@ -6,15 +6,32 @@ import { CONFIG, isConfigured, getApiUrl, getAnonKey, captureApiOverride } from 
 
 captureApiOverride();
 
-let _token = localStorage.getItem(CONFIG.STORAGE_KEYS.token) || '';
+function storedToken() {
+  try {
+    const persistent = localStorage.getItem(CONFIG.STORAGE_KEYS.token);
+    if (persistent) return persistent;
+  } catch (e) {}
+  try {
+    return sessionStorage.getItem(CONFIG.STORAGE_KEYS.token) || '';
+  } catch (e) {
+    return '';
+  }
+}
+
+let _token = storedToken();
 
 export function getToken() {
   return _token;
 }
-export function setToken(token) {
+export function setToken(token, remember = true) {
   _token = token || '';
-  if (token) localStorage.setItem(CONFIG.STORAGE_KEYS.token, token);
-  else localStorage.removeItem(CONFIG.STORAGE_KEYS.token);
+  try {
+    localStorage.removeItem(CONFIG.STORAGE_KEYS.token);
+    sessionStorage.removeItem(CONFIG.STORAGE_KEYS.token);
+    if (!token) return;
+    const store = remember ? localStorage : sessionStorage;
+    store.setItem(CONFIG.STORAGE_KEYS.token, token);
+  } catch (e) { return; }
 }
 
 export class ApiError extends Error {

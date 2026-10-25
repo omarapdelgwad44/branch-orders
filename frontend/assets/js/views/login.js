@@ -6,12 +6,17 @@ import { setLang, getLang, t, errorText } from '../i18n.js';
 import { api, warmup } from '../api.js';
 import { icon } from '../icons.js';
 import { isConfigured, CONFIG } from '../config.js';
+import { initLoginScene } from '../login-motion.js';
+
+let stopScene = null;
 
 export function render(app, { onLogin }) {
   warmup();
   setLang(getLang());
+  if (stopScene) stopScene();
   app.innerHTML = layout();
   bind(app, onLogin);
+  stopScene = initLoginScene(document.querySelector('.login-hero'));
   checkStatus(app);
 }
 
@@ -24,8 +29,13 @@ function layout() {
   return (
     '<div class="login">' +
     '<aside class="login-hero">' +
-      '<div class="hero-glow"></div>' +
-      '<div class="hero-grid"></div>' +
+      '<canvas class="hero-canvas" aria-hidden="true"></canvas>' +
+      '<div class="hero-scene" aria-hidden="true">' +
+        '<span class="hero-orb hero-orb-1"></span>' +
+        '<span class="hero-orb hero-orb-2"></span>' +
+        '<span class="hero-orb hero-orb-3"></span>' +
+        '<span class="hero-ring"></span>' +
+      '</div>' +
       '<div class="hero-inner">' +
         '<div class="hero-brand">' +
           '<img class="hero-brand-logo" src="assets/images/sdg-logo-full-transparent.png" alt="SDG — Smart Distribution Group" width="696" height="955" fetchpriority="high">' +
@@ -39,26 +49,49 @@ function layout() {
     '</aside>' +
     '<main class="login-panel">' +
       '<div class="login-card">' +
-        '<div class="login-card-title-row"><h2>' + esc(t('login.welcome')) + '</h2>' + langBtn + '</div>' +
-        '<p class="login-sub">' + esc(t('login.subtitle')) + '</p>' +
+        '<div class="login-card-head">' +
+          '<div>' +
+            '<h2>' + esc(t('login.welcome')) + '</h2>' +
+            '<p class="login-sub">' + esc(t('login.subtitle')) + '</p>' +
+          '</div>' +
+          langBtn +
+        '</div>' +
         '<div class="login-alert hidden" id="loginAlert" role="alert" aria-live="polite"></div>' +
         '<form id="loginForm" novalidate>' +
-          '<label class="field">' +
-            '<span class="field-label">' + esc(t('login.username')) + '</span>' +
-            '<span class="input-wrap"><span class="input-icon" aria-hidden="true">' + icon('user', 18) + '</span>' +
-            '<input class="input" type="text" name="username" autocomplete="username" spellcheck="false" list="loginHints" required autofocus></span>' +
+          '<div class="field">' +
+            '<label class="field-label" for="loginUsername">' + esc(t('login.username')) + '</label>' +
+            '<span class="input-wrap">' +
+              '<span class="input-icon" aria-hidden="true">' + icon('user', 18) + '</span>' +
+              '<input class="input" id="loginUsername" type="text" name="username" placeholder="' + esc(t('login.usernamePH')) + '" autocomplete="username" spellcheck="false" list="loginHints" required autofocus>' +
+            '</span>' +
             '<datalist id="loginHints">' + (hints || '<option></option>') + '</datalist>' +
-          '</label>' +
-          '<label class="field">' +
-            '<span class="field-label">' + esc(t('login.password')) + '</span>' +
-            '<span class="input-wrap"><span class="input-icon" aria-hidden="true">' + icon('lock', 18) + '</span>' +
-            '<input class="input" id="loginPassword" type="password" name="password" autocomplete="current-password" required>' +
-            '<button class="password-toggle" id="passwordToggle" type="button" aria-label="' + esc(t('login.showPassword')) + '" aria-pressed="false">' + icon('eye', 18) + '</button></span>' +
-          '</label>' +
-          '<button class="btn btn-primary btn-block btn-lg login-submit" type="submit"><span>' +
-            esc(t('login.submit')) + '</span></button>' +
+          '</div>' +
+          '<div class="field">' +
+            '<div class="field-label-row">' +
+              '<label class="field-label" for="loginPassword">' + esc(t('login.password')) + '</label>' +
+              '<button class="forgot-link" id="forgotPassword" type="button" aria-expanded="false" aria-controls="forgotHint">' + esc(t('login.forgot')) + '</button>' +
+            '</div>' +
+            '<span class="input-wrap">' +
+              '<span class="input-icon" aria-hidden="true">' + icon('lock', 18) + '</span>' +
+              '<input class="input" id="loginPassword" type="password" name="password" placeholder="' + esc(t('login.passwordPH')) + '" autocomplete="current-password" required>' +
+              '<button class="password-toggle" id="passwordToggle" type="button" aria-label="' + esc(t('login.showPassword')) + '" aria-pressed="false">' + icon('eye', 18) + '</button>' +
+            '</span>' +
+            '<p class="forgot-hint hidden" id="forgotHint" role="status">' + esc(t('login.forgotHint')) + '</p>' +
+          '</div>' +
+          '<div class="login-options">' +
+            '<label class="remember">' +
+              '<input type="checkbox" id="rememberMe" name="remember" checked>' +
+              '<span class="remember-box" aria-hidden="true">' + icon('check', 12) + '</span>' +
+              '<span>' + esc(t('login.remember')) + '</span>' +
+            '</label>' +
+          '</div>' +
+          '<button class="btn btn-primary btn-block login-submit" type="submit">' +
+            '<span class="login-submit-label">' + esc(t('login.submit')) + '</span>' +
+            '<span class="login-spinner" aria-hidden="true"></span>' +
+          '</button>' +
         '</form>' +
         '<div class="login-note hidden" id="loginNote"></div>' +
+        '<div class="login-secure">' + icon('shield', 14) + '<span>' + esc(t('login.secure')) + '</span></div>' +
       '</div>' +
     '</main>' +
     '</div>'
@@ -72,29 +105,54 @@ function esc(s) {
 function showAlert(node, message, ok) {
   node.classList.remove('hidden', 'alert-ok', 'alert-err');
   node.classList.add(ok ? 'alert-ok' : 'alert-err');
-  node.textContent = message;
+  node.innerHTML = '<span class="alert-ic" aria-hidden="true">' + icon(ok ? 'check' : 'alert', 17) + '</span>' +
+    '<span class="alert-text">' + esc(message) + '</span>';
 }
 
 function bind(app, onLogin) {
   document.getElementById('langSwitch').addEventListener('click', () => {
+    const currentUsername = document.getElementById('loginUsername');
+    const currentRemember = document.getElementById('rememberMe');
+    const username = currentUsername ? currentUsername.value : '';
+    const remember = currentRemember ? currentRemember.checked : true;
+    if (stopScene) stopScene();
     setLang(getLang() === 'ar' ? 'en' : 'ar');
     app.innerHTML = layout();
     bind(app, onLogin);
+    const nextUsername = document.getElementById('loginUsername');
+    if (nextUsername && username) nextUsername.value = username;
+    const nextRemember = document.getElementById('rememberMe');
+    if (nextRemember) nextRemember.checked = remember;
+    stopScene = initLoginScene(document.querySelector('.login-hero'));
     checkStatus(app);
   });
 
   const form = document.getElementById('loginForm');
   const alertBox = document.getElementById('loginAlert');
   const btn = form.querySelector('button[type="submit"]');
-  const btnLabel = btn.querySelector('span');
-  const password = form.password;
+  const btnLabel = btn.querySelector('.login-submit-label');
+  const password = form.elements.namedItem('password');
   const passwordToggle = document.getElementById('passwordToggle');
+  const forgotBtn = document.getElementById('forgotPassword');
+  const forgotHint = document.getElementById('forgotHint');
 
   passwordToggle.addEventListener('click', () => {
     const visible = password.type === 'text';
     password.type = visible ? 'password' : 'text';
     passwordToggle.setAttribute('aria-pressed', String(!visible));
     passwordToggle.setAttribute('aria-label', t(visible ? 'login.showPassword' : 'login.hidePassword'));
+    passwordToggle.innerHTML = icon(visible ? 'eye' : 'eyeOff', 18);
+  });
+
+  forgotBtn.addEventListener('click', () => {
+    const open = forgotHint.classList.contains('hidden');
+    forgotHint.classList.toggle('hidden', !open);
+    forgotBtn.setAttribute('aria-expanded', String(open));
+  });
+
+  password.addEventListener('input', () => {
+    const wrap = password.closest('.input-wrap');
+    if (wrap) wrap.classList.remove('has-error');
   });
 
   const setSubmitting = (submitting) => {
@@ -106,19 +164,28 @@ function bind(app, onLogin) {
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const username = form.username.value.trim();
-    const password = form.password.value;
-    if (!username || !password) {
+    const usernameInput = form.elements.namedItem('username');
+    const passwordInput = form.elements.namedItem('password');
+    const username = usernameInput.value.trim();
+    const passwordValue = passwordInput.value;
+    if (!username || !passwordValue) {
       showAlert(alertBox, t('login.empty') || 'Please enter your credentials.', false);
-      (!username ? form.username : form.password).focus();
+      (!username ? usernameInput : passwordInput).focus();
       return;
     }
+    const remember = document.getElementById('rememberMe').checked;
     setSubmitting(true);
     try {
-      const session = await api('auth.login', { username, password });
-      onLogin(session);
+      const session = await api('auth.login', { username, password: passwordValue });
+      onLogin(session, { remember });
     } catch (err) {
-      showAlert(alertBox, errorText(err), false);
+      const invalid = err && err.code === 'invalid_credentials';
+      showAlert(alertBox, invalid ? t('login.invalidHint') : errorText(err), false);
+      if (invalid) {
+        const wrap = password.closest('.input-wrap');
+        if (wrap) wrap.classList.add('has-error');
+        password.focus();
+      }
       setSubmitting(false);
     }
   });
@@ -192,9 +259,9 @@ function bindFirstRun(note) {
       btn.classList.add('loading');
       try {
         await api('system.setup.firstAdmin', {
-          username: form.username.value.trim(),
-          password: form.password.value,
-          full_name: form.fullName.value.trim()
+          username: form.elements.namedItem('username').value.trim(),
+          password: form.elements.namedItem('password').value,
+          full_name: form.elements.namedItem('fullName').value.trim()
         });
         note.innerHTML = '<span class="note-ic">' + icon('check', 15) + '</span>' + esc(t('firstRun.created'));
       } catch (err) {
