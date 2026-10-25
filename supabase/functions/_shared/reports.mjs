@@ -151,6 +151,53 @@ export function createReports(store, cfg, activity) {
       .sort((a, b) => b.requested - a.requested);
   }
 
+  // Requested quantities pivoted by item and branch.  Keeping inactive
+  // branches out prevents old/closed locations from appearing in the
+  // purchasing sheet, while active branches with no matching order remain
+  // visible so the admin can follow up with them.
+  async function branchOrderMatrix(filters) {
+    const f = filters || {};
+    const r = await filteredOrders(f);
+    const allBranches = await store.all('Branches');
+    const branchRows = allBranches
+      .filter((b) => String(b.status || 'active') === 'active')
+      .filter((b) => !f.branch_id || String(b.branch_id) === String(f.branch_id))
+      .sort((a, b) => String(a.branch_name || '').localeCompare(String(b.branch_name || '')));
+    const branchIds = new Set(branchRows.map((b) => String(b.branch_id)));
+    const hasOrder = {};
+    const items = {};
+
+    r.rows.filter((o) => String(o.status) !== ORDER_STATUS.DRAFT && branchIds.has(String(o.branch_id))).forEach((o) => {
+      hasOrder[o.branch_id] = true;
+      r.allItems.filter((l) => String(l.order_id) === String(o.order_id)).forEach((l) => {
+        const quantity = Number(l.requested_quantity) || 0;
+        if (!items[l.item_id]) {
+          const it = r.im[l.item_id] || {};
+          items[l.item_id] = {
+            item_id: l.item_id,
+            item_name: it.item_name || l.item_id,
+            item_code: it.item_code || '',
+            unit: it.unit || 'pc',
+            quantities: {}
+          };
+        }
+        const row = items[l.item_id];
+        row.quantities[o.branch_id] = (Number(row.quantities[o.branch_id]) || 0) + quantity;
+      });
+    });
+
+    const branches = branchRows.map((b) => ({
+      branch_id: b.branch_id,
+      branch_name: b.branch_name || b.branch_id,
+      branch_code: b.branch_code || '',
+      has_order: Boolean(hasOrder[b.branch_id])
+    }));
+    const rows = Object.keys(items).map((id) => items[id])
+      .filter((row) => Object.values(row.quantities).some((n) => n > 0))
+      .sort((a, b) => String(a.item_name).localeCompare(String(b.item_name)));
+    return { branches, rows };
+  }
+
   async function shortageReport(filters) {
     const r = await filteredOrders(filters);
     const out = [];
@@ -198,6 +245,24 @@ export function createReports(store, cfg, activity) {
     } else if (kind === 'items') {
       cols = ['item_id', 'item_code', 'item_name', 'category', 'unit', 'requested', 'approved', 'sent', 'received', 'shortage'];
       rows = await itemDemand(filters);
+    } else if (kind === 'matrix') {
+      const matrix = await branchOrderMatrix(filters);
+      cols = ['item_code', 'item_name', 'unit'].concat(matrix.branches.map((b) =>
+        b.branch_name + (b.has_order ? '' : ' (لم يُدخل طلبًا)'))).concat(['total_requested']);
+      rows = matrix.rows.map((row) => {
+        const out = {
+          item_code: row.item_code,
+          item_name: row.item_name,
+          unit: row.unit,
+          total_requested: 0
+        };
+        matrix.branches.forEach((b) => {
+          const key = b.branch_name + (b.has_order ? '' : ' (لم يُدخل طلبًا)');
+          out[key] = b.has_order ? (Number(row.quantities[b.branch_id]) || 0) : 'لم يُدخل طلبًا';
+          out.total_requested += Number(row.quantities[b.branch_id]) || 0;
+        });
+        return out;
+      });
     } else if (kind === 'shortages') {
       cols = ['order_number', 'branch_name', 'item_name', 'unit', 'sent_quantity', 'received_quantity', 'shortage_quantity', 'shortage_reason', 'received_at'];
       rows = await shortageReport(filters);
@@ -319,6 +384,7 @@ export function createReports(store, cfg, activity) {
     ordersReport,
     branchSummary,
     itemDemand,
+    branchOrderMatrix,
     shortageReport,
     csv,
     metrics,

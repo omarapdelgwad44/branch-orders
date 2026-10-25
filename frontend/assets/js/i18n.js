@@ -246,8 +246,11 @@ const DICTS = {
     'reports.orders': 'تقرير الطلبات',
     'reports.branches': 'أداء الفروع',
     'reports.items': 'طلب الأصناف',
+    'reports.matrix': 'تجميع طلبات الفروع',
     'reports.shortages': 'تقرير العجز',
     'reports.download': 'تحميل CSV',
+    'reports.noOrder': 'لم يُدخل طلبًا',
+    'reports.totalRequested': 'الإجمالي',
     'reports.noData': 'لا توجد بيانات للمعايير المحددة.',
     'reports.applyFiltersHint': 'استخدم عوامل التصفية ثم حمّل التقرير ليتبع نفس الفلترة.'
   },
@@ -493,8 +496,11 @@ const DICTS = {
     'reports.orders': 'Orders report',
     'reports.branches': 'Branch performance',
     'reports.items': 'Item demand',
+    'reports.matrix': 'Branch order summary',
     'reports.shortages': 'Shortage report',
     'reports.download': 'Download CSV',
+    'reports.noOrder': 'No order entered',
+    'reports.totalRequested': 'Total',
     'reports.noData': 'No data matches the selected criteria.',
     'reports.applyFiltersHint': 'Use the filters above; exports follow the same filters.'
   }
