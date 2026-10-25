@@ -88,6 +88,7 @@ function layout() {
         '</form>' +
         '<div class="login-note hidden" id="loginNote"></div>' +
         '<div class="login-secure">' + icon('shield', 14) + '<span>' + esc(t('login.secure')) + '</span></div>' +
+        '<p class="login-credit">' + esc(t('login.credit')) + '</p>' +
       '</div>' +
     '</main>' +
     '</div>'

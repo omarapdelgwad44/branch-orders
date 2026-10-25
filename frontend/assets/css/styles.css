@@ -711,6 +711,7 @@ tr.av-off .badge.av-tag { display: inline-flex; }
 .alert-ok { background: var(--success-soft); color: #0d5f2d; border: 1px solid #c3e7cd; }
 .login-secure { display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 18px; color: #577386; font-size: .8rem; font-weight: 600; letter-spacing: .02em; }
 .login-secure svg { color: #6f8a9a; }
+.login-credit { margin: 8px 0 0; text-align: center; color: #577386; font-size: .8rem; line-height: 1.5; }
 .login-note { margin-top: 18px; display: flex; gap: 9px; align-items: flex-start; font-size: .82rem; color: var(--muted); background: #f7fbfd; border: 1px dashed var(--line); border-radius: 12px; padding: 11px 13px; }
 .login-note .note-ic { flex: none; margin-top: 1px; }
 .login-note:has(.setup-card) { display: block; padding: 16px; border-style: solid; border-color: #e1edf3; background: #f8fbfd; }
