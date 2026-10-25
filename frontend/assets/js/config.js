@@ -8,7 +8,9 @@ export const CONFIG = {
   APP_NAME: 'Branch Orders',
   APP_TAGLINE: 'Internal ordering system',
   LOGIN_HINTS: ['admin', 'embaba', 'toukh', 'masrrad', 'helwelsham', 'zakah',
-    'bravocairo', 'bravoalexandria', 'kafrelsheikh', 'bahira'],
+    'bravocairo', 'bravoalexandria', 'kafrelsheikh', 'bahira',
+    'qalyubiaelvan', 'qalyubiaef', 'mhicairo', 'mhisharqia', 'mhidakahlia',
+    'mhikafrelsheikh', 'mhimenoufia', 'mibeheira', 'mhialexandria'],
   STORAGE_KEYS: {
     token: 'bo.token',
     session: 'bo.session',
