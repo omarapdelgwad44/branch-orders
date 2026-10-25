@@ -67,16 +67,12 @@ function layout() {
             '<datalist id="loginHints">' + (hints || '<option></option>') + '</datalist>' +
           '</div>' +
           '<div class="field">' +
-            '<div class="field-label-row">' +
-              '<label class="field-label" for="loginPassword">' + esc(t('login.password')) + '</label>' +
-              '<button class="forgot-link" id="forgotPassword" type="button" aria-expanded="false" aria-controls="forgotHint">' + esc(t('login.forgot')) + '</button>' +
-            '</div>' +
+            '<label class="field-label" for="loginPassword">' + esc(t('login.password')) + '</label>' +
             '<span class="input-wrap">' +
               '<span class="input-icon" aria-hidden="true">' + icon('lock', 18) + '</span>' +
               '<input class="input" id="loginPassword" type="password" name="password" placeholder="' + esc(t('login.passwordPH')) + '" autocomplete="current-password" required>' +
               '<button class="password-toggle" id="passwordToggle" type="button" aria-label="' + esc(t('login.showPassword')) + '" aria-pressed="false">' + icon('eye', 18) + '</button>' +
             '</span>' +
-            '<p class="forgot-hint hidden" id="forgotHint" role="status">' + esc(t('login.forgotHint')) + '</p>' +
           '</div>' +
           '<div class="login-options">' +
             '<label class="remember">' +
@@ -133,8 +129,6 @@ function bind(app, onLogin) {
   const btnLabel = btn.querySelector('.login-submit-label');
   const password = form.elements.namedItem('password');
   const passwordToggle = document.getElementById('passwordToggle');
-  const forgotBtn = document.getElementById('forgotPassword');
-  const forgotHint = document.getElementById('forgotHint');
 
   passwordToggle.addEventListener('click', () => {
     const visible = password.type === 'text';
@@ -144,11 +138,6 @@ function bind(app, onLogin) {
     passwordToggle.innerHTML = icon(visible ? 'eye' : 'eyeOff', 18);
   });
 
-  forgotBtn.addEventListener('click', () => {
-    const open = forgotHint.classList.contains('hidden');
-    forgotHint.classList.toggle('hidden', !open);
-    forgotBtn.setAttribute('aria-expanded', String(open));
-  });
 
   password.addEventListener('input', () => {
     const wrap = password.closest('.input-wrap');

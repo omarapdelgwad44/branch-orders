@@ -643,15 +643,6 @@ tr.av-off .badge.av-tag { display: inline-flex; }
 .lang-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); }
 .login .field { margin-bottom: 16px; }
 .login .field-label { display: block; font-size: .82rem; font-weight: 700; color: var(--ink); letter-spacing: .01em; margin-bottom: 7px; }
-.field-label-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 7px; }
-.field-label-row .field-label { margin-bottom: 0; }
-.forgot-link {
-  border: 0; background: none; padding: 0; border-radius: 4px;
-  color: var(--primary); font: inherit; font-size: .84rem; font-weight: 600;
-  text-decoration: none; transition: color .15s var(--ease);
-}
-.forgot-link:hover { color: var(--primary-strong); text-decoration: underline; text-underline-offset: 3px; }
-.forgot-link:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
 .login .input {
   height: 54px; padding: 0 14px;
   border: 1.5px solid #7895a6; border-radius: 14px;
@@ -683,12 +674,6 @@ tr.av-off .badge.av-tag { display: inline-flex; }
 .login .password-toggle:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .login .input-wrap.has-error .input { border-color: #e3a29a; background: #fff8f7; box-shadow: 0 0 0 4px rgba(180, 35, 24, .08); }
 .login .input-wrap.has-error .input-icon { color: var(--danger); }
-.forgot-hint {
-  margin: 8px 0 0; padding: 9px 12px;
-  font-size: .88rem; line-height: 1.55; color: var(--muted);
-  background: #f4f9fc; border: 1px solid #e1edf3; border-radius: 10px;
-}
-.forgot-hint.hidden { display: none; }
 .login-options { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 2px 0 20px; }
 .remember {
   position: relative; display: inline-flex; align-items: center; gap: 9px;
