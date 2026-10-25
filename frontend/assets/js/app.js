@@ -75,7 +75,6 @@ function isActive(href) {
 
 function renderShell(user) {
   const appRoot = document.getElementById('app');
-  const brandMonogram = 'BO';
   const navItems = sidebarNav(user).map(([href, key, ic]) => {
     const active = isActive(href);
     return '<a class="nav-item' + (active ? ' active' : '') + '" href="' + href + '">' +
@@ -87,7 +86,7 @@ function renderShell(user) {
     '<div class="backdrop" id="backdrop"></div>' +
     '<aside class="sidebar" id="sidebar" aria-label="' + escNav(t('app.name')) + '">' +
       '<div class="brand">' +
-        '<span class="brand-mark">' + brandMonogram + '</span>' +
+        '<img class="brand-logo" src="assets/images/sdg-mark-transparent.png" alt="SDG" width="256" height="256">' +
         '<span class="brand-text"><b>' + escNav(t('app.name')) + '</b><em>' + escNav(t('app.tagline')) + '</em></span>' +
       '</div>' +
       '<nav class="nav" aria-label="' + escNav(t('app.name')) + '">' + navItems + '</nav>' +

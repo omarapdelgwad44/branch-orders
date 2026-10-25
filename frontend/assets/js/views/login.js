@@ -28,38 +28,35 @@ function layout() {
       '<div class="hero-grid"></div>' +
       '<div class="hero-inner">' +
         '<div class="hero-brand">' +
-          '<span class="brand-mark light">BO</span>' +
+          '<img class="hero-brand-logo" src="assets/images/sdg-logo-official.png" alt="SDG — Smart Distribution Group" width="720" height="988" fetchpriority="high">' +
           '<span class="brand-text"><b>' + esc(t('app.name')) + '</b><em>' + esc(t('app.tagline')) + '</em></span>' +
         '</div>' +
         '<div class="hero-copy">' +
-          '<h1>' + esc(t('login.brandHero')) + '</h1>' +
+          '<h1 class="login-steps"><span>' + esc(t('login.stat.order')) + '</span><i aria-hidden="true">·</i><span>' + esc(t('login.stat.track')) + '</span><i aria-hidden="true">·</i><span>' + esc(t('login.stat.receive')) + '</span></h1>' +
           '<p>' + esc(t('login.brandSub')) + '</p>' +
-          '<div class="hero-stats">' +
-            '<div class="hero-stat"><b>' + esc(t('login.stat.order')) + '</b><em>' + esc(t('login.stat.track')) + '</em></div>' +
-            '<div class="hero-stat"><b>' + esc(t('login.stat.track')) + '</b><em>' + esc(t('login.stat.receive')) + '</em></div>' +
-            '<div class="hero-stat"><b>' + esc(t('login.stat.receive')) + '</b><em>' + esc(t('login.stat.order')) + '</em></div>' +
-          '</div>' +
         '</div>' +
       '</div>' +
     '</aside>' +
     '<main class="login-panel">' +
       '<div class="login-card">' +
-        '<div class="login-card-top">' + langBtn + '</div>' +
-        '<h2>' + esc(t('login.welcome')) + '</h2>' +
+        '<div class="login-card-title-row"><h2>' + esc(t('login.welcome')) + '</h2>' + langBtn + '</div>' +
         '<p class="login-sub">' + esc(t('login.subtitle')) + '</p>' +
-        '<div class="login-alert hidden" id="loginAlert" role="alert"></div>' +
+        '<div class="login-alert hidden" id="loginAlert" role="alert" aria-live="polite"></div>' +
         '<form id="loginForm" novalidate>' +
           '<label class="field">' +
             '<span class="field-label">' + esc(t('login.username')) + '</span>' +
-            '<input class="input" type="text" name="username" autocomplete="username" list="loginHints" required autofocus>' +
+            '<span class="input-wrap"><span class="input-icon" aria-hidden="true">' + icon('user', 18) + '</span>' +
+            '<input class="input" type="text" name="username" autocomplete="username" spellcheck="false" list="loginHints" required autofocus></span>' +
             '<datalist id="loginHints">' + (hints || '<option></option>') + '</datalist>' +
           '</label>' +
           '<label class="field">' +
             '<span class="field-label">' + esc(t('login.password')) + '</span>' +
-            '<input class="input" type="password" name="password" autocomplete="current-password" required>' +
+            '<span class="input-wrap"><span class="input-icon" aria-hidden="true">' + icon('lock', 18) + '</span>' +
+            '<input class="input" id="loginPassword" type="password" name="password" autocomplete="current-password" required>' +
+            '<button class="password-toggle" id="passwordToggle" type="button" aria-label="' + esc(t('login.showPassword')) + '" aria-pressed="false">' + icon('eye', 18) + '</button></span>' +
           '</label>' +
-          '<button class="btn btn-primary btn-block btn-lg" type="submit">' +
-            t('login.submit') + '</button>' +
+          '<button class="btn btn-primary btn-block btn-lg login-submit" type="submit"><span>' +
+            esc(t('login.submit')) + '</span></button>' +
         '</form>' +
         '<div class="login-note hidden" id="loginNote"></div>' +
       '</div>' +
@@ -89,6 +86,23 @@ function bind(app, onLogin) {
   const form = document.getElementById('loginForm');
   const alertBox = document.getElementById('loginAlert');
   const btn = form.querySelector('button[type="submit"]');
+  const btnLabel = btn.querySelector('span');
+  const password = form.password;
+  const passwordToggle = document.getElementById('passwordToggle');
+
+  passwordToggle.addEventListener('click', () => {
+    const visible = password.type === 'text';
+    password.type = visible ? 'password' : 'text';
+    passwordToggle.setAttribute('aria-pressed', String(!visible));
+    passwordToggle.setAttribute('aria-label', t(visible ? 'login.showPassword' : 'login.hidePassword'));
+  });
+
+  const setSubmitting = (submitting) => {
+    btn.disabled = submitting;
+    btn.classList.toggle('loading', submitting);
+    btn.setAttribute('aria-busy', String(submitting));
+    btnLabel.textContent = submitting ? t('login.signingIn') : t('login.submit');
+  };
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -96,17 +110,16 @@ function bind(app, onLogin) {
     const password = form.password.value;
     if (!username || !password) {
       showAlert(alertBox, t('login.empty') || 'Please enter your credentials.', false);
+      (!username ? form.username : form.password).focus();
       return;
     }
-    btn.disabled = true;
-    btn.classList.add('loading');
+    setSubmitting(true);
     try {
       const session = await api('auth.login', { username, password });
       onLogin(session);
     } catch (err) {
       showAlert(alertBox, errorText(err), false);
-      btn.disabled = false;
-      btn.classList.remove('loading');
+      setSubmitting(false);
     }
   });
 }
