@@ -490,6 +490,77 @@ export async function runSharedSuite(host) {
   eq(latest.order_number, nums[nums.length - 1], 'list sorted newest first');
 
   // ---------------------------------------------------------------------------
+  // I. Delete and item import
+  // ---------------------------------------------------------------------------
+  section('I. Delete and item import');
+
+  const freshItem = await apiOk('admin.items.create', { item_name: 'Disposable Sample', item_code: 'TMP-DEL', unit: 'pc' }, adminTokenBack);
+  const removedItem = await api('admin.items.delete', { item_id: freshItem.item_id }, adminTokenBack);
+  eq(removedItem.ok, true, 'unused item can be deleted');
+  const stillThere = (await apiOk('admin.items.list', {}, adminTokenBack)).items.some((i) => i.item_id === freshItem.item_id);
+  eq(stillThere, false, 'deleted item is gone from the list');
+
+  const usedItem = await api('admin.items.delete', { item_id: 'ITM-5' }, adminTokenBack);
+  eq(usedItem.ok, false, 'item used on an order cannot be deleted');
+  eq(usedItem.error && usedItem.error.code, 'in_use', 'in_use when item is on an order');
+
+  const imported = await apiOk('admin.items.import', {
+    rows: [
+      { row: 2, item_code: 'EXAMPLE', item_name: 'skip me', unit: 'pc' },
+      { row: 3, item_code: 'XLS-1', item_name: 'Imported Tea', category: 'Food', unit: 'box', sort_order: 4, active: 'نعم' },
+      { row: 4, item_code: 'XLS-1', item_name: 'Imported Tea Large', category: 'Food', unit: 'box', sort_order: 5, active: 'لا' }
+    ]
+  }, adminTokenBack);
+  eq(imported.created, 1, 'import creates a new item');
+  eq(imported.updated, 1, 'import updates a matching code');
+  eq(imported.skipped, 1, 'import skips the template example row');
+  const xls = (await apiOk('admin.items.list', {}, adminTokenBack)).items.filter((i) => i.item_code === 'XLS-1')[0];
+  eq(xls && xls.item_name, 'Imported Tea Large', 'imported item keeps the latest name');
+  eq(xls && xls.active, false, 'imported inactive flag is stored');
+
+  const branchImport = await apiOk('admin.branches.import', {
+    rows: [
+      { row: 2, branch_code: 'EXAMPLE', branch_name: 'skip', location: 'x', status: 'نشط' },
+      { row: 3, branch_code: 'BR-XLS', branch_name: 'Imported Branch', location: 'Giza', status: 'نشط' },
+      { row: 4, branch_code: 'BR-XLS', branch_name: 'Imported Branch Updated', location: 'Alex', status: 'غير نشط' }
+    ]
+  }, adminTokenBack);
+  eq(branchImport.created, 1, 'branch import creates');
+  eq(branchImport.updated, 1, 'branch import updates by code');
+  eq(branchImport.skipped, 1, 'branch import skips example row');
+  const br = (await apiOk('admin.branches.list', {}, adminTokenBack)).branches.filter((b) => b.branch_code === 'BR-XLS')[0];
+  eq(br && br.branch_name, 'Imported Branch Updated', 'imported branch name updated');
+  eq(br && br.status, 'inactive', 'imported branch can be inactive');
+
+  const userImport = await apiOk('admin.users.import', {
+    rows: [
+      { row: 2, username: 'EXAMPLE', full_name: 'skip', password: 'Pass@123', role: 'مستخدم فرع', branch: 'CAIRO-1', status: 'نشط' },
+      { row: 3, username: 'xls.user', full_name: 'Excel User', password: 'Pass@123', role: 'مستخدم فرع', branch: 'CAIRO-1', status: 'نشط' },
+      { row: 4, username: 'xls.user', full_name: 'Excel User Updated', password: '', role: 'branch_user', branch: 'Cairo - Nasr City', status: 'نشط' },
+      { row: 5, username: 'nobody', full_name: 'Missing Branch', password: 'Pass@123', role: 'مستخدم فرع', branch: 'NO-SUCH', status: 'نشط' }
+    ]
+  }, adminTokenBack);
+  eq(userImport.created, 1, 'user import creates');
+  eq(userImport.updated, 1, 'user import updates by username');
+  eq(userImport.skipped, 1, 'user import skips example row');
+  eq(userImport.errors.length, 1, 'user import reports an unknown branch');
+  const xu = (await apiOk('admin.users.list', {}, adminTokenBack)).users.filter((u) => u.username === 'xls.user')[0];
+  eq(xu && xu.full_name, 'Excel User Updated', 'imported user name updated');
+  eq(xu && xu.branch_id, 'BR-001', 'imported user branch resolved by name');
+  const xlsLogin = await api('auth.login', { username: 'xls.user', password: 'Pass@123' });
+  eq(xlsLogin.ok, true, 'imported user can log in with the sheet password');
+
+  const spareBranch = await apiOk('admin.branches.create', { branch_name: 'Temp Branch', location: 'Nowhere' }, adminTokenBack);
+  const removedBranch = await api('admin.branches.delete', { branch_id: spareBranch.branch_id }, adminTokenBack);
+  eq(removedBranch.ok, true, 'branch without users or orders can be deleted');
+  const cairo = (await apiOk('admin.branches.list', {}, adminTokenBack)).branches.filter((b) => b.branch_code === 'CAIRO-1')[0];
+  const blockedBranch = await api('admin.branches.delete', { branch_id: cairo.branch_id }, adminTokenBack);
+  eq(blockedBranch.error && blockedBranch.error.code, 'in_use', 'branch with users cannot be deleted');
+
+  const selfDelete = await api('admin.users.delete', { user_id: ADMIN_ID }, adminTokenBack);
+  eq(selfDelete.error && selfDelete.error.code, 'delete_self', 'signed-in admin cannot delete themselves');
+
+  // ---------------------------------------------------------------------------
   // Summary
   // ---------------------------------------------------------------------------
   section('Result');

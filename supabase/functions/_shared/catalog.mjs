@@ -8,6 +8,30 @@ function publicUser(row) {
   return out;
 }
 
+function parseActive(value) {
+  return parseStatus(value) === USER_STATUS.ACTIVE;
+}
+
+function parseStatus(value) {
+  const s = String(value == null ? '' : value).trim().toLowerCase();
+  if (['0', 'false', 'no', 'n', 'لا', 'غير نشط', 'inactive'].indexOf(s) !== -1) return USER_STATUS.INACTIVE;
+  return USER_STATUS.ACTIVE;
+}
+
+function parseRole(value) {
+  const s = String(value || '').trim().toLowerCase();
+  if (['admin', 'مدير', 'مدير نظام', 'مسؤول'].indexOf(s) !== -1) return USER_ROLES.ADMIN;
+  return USER_ROLES.BRANCH_USER;
+}
+
+function findBranch(branches, label) {
+  const s = String(label || '').trim().toLowerCase();
+  if (!s) return null;
+  return branches.find((b) =>
+    String(b.branch_code || '').toLowerCase() === s || String(b.branch_name || '').toLowerCase() === s
+  ) || null;
+}
+
 export function createCatalog(store, cfg, ids, activity, auth) {
   const Users = {
     async list() {
@@ -102,6 +126,87 @@ export function createCatalog(store, cfg, ids, activity, auth) {
       const updated = await store.update('Users', row, patch);
       await activity.log(null, 'user_updated', 'user', userId, { role: patch.role || row.role });
       return publicUser(updated);
+    },
+    async remove(userId, actor) {
+      const row = await store.find('Users', 'user_id', userId);
+      if (!row) fail('not_found', 'User not found.');
+      if (actor && String(actor.user_id) === String(userId)) {
+        fail('delete_self', 'You cannot delete the account you are signed in with.');
+      }
+      if (String(row.role) === USER_ROLES.ADMIN && String(row.status) === USER_STATUS.ACTIVE) {
+        const admins = (await store.all('Users')).filter((r) =>
+          String(r.role) === USER_ROLES.ADMIN && String(r.status) === USER_STATUS.ACTIVE && String(r.user_id) !== String(userId));
+        if (!admins.length) fail('delete_last_admin', 'You cannot delete the last active administrator.');
+      }
+      const orders = await store.all('Orders');
+      if (orders.some((o) => String(o.created_by) === String(userId))) {
+        fail('in_use', 'This user still has orders and cannot be deleted.');
+      }
+      await store.remove('Sessions', 'user_id', userId);
+      await store.remove('Users', 'user_id', userId);
+      await activity.log(actor && actor.user_id, 'user_deleted', 'user', userId, { username: row.username });
+      return { ok: true };
+    },
+    async importRows(rows) {
+      if (!Array.isArray(rows) || !rows.length) fail('validation', 'The file has no rows to import.');
+      const existing = await store.all('Users');
+      const branchList = await store.all('Branches');
+      let created = 0;
+      let updated = 0;
+      let skipped = 0;
+      const errors = [];
+      for (let i = 0; i < rows.length; i++) {
+        const raw = rows[i] || {};
+        const username = String(raw.username || '').trim();
+        const rowNo = parseInt(raw.row, 10) || (i + 2);
+        if (!username && !String(raw.full_name || '').trim()) { skipped++; continue; }
+        if (username.toUpperCase() === 'EXAMPLE') { skipped++; continue; }
+        if (!username) {
+          errors.push({ row: rowNo, message: 'Username is required.' });
+          continue;
+        }
+        const role = parseRole(raw.role);
+        const branch = findBranch(branchList, raw.branch);
+        if (role === USER_ROLES.BRANCH_USER && !branch) {
+          errors.push({ row: rowNo, message: 'Branch was not found.' });
+          continue;
+        }
+        const hit = existing.find((u) => String(u.username || '').toLowerCase() === username.toLowerCase());
+        const password = String(raw.password || '');
+        try {
+          if (hit) {
+            const payload = {
+              full_name: String(raw.full_name || hit.full_name || '').trim(),
+              email: String(raw.email || '').trim(),
+              role,
+              branch_id: role === USER_ROLES.BRANCH_USER ? branch.branch_id : '',
+              status: parseStatus(raw.status)
+            };
+            if (password) payload.new_password = password;
+            await this.update(hit.user_id, payload);
+            updated++;
+          } else {
+            if (password.length < 6) {
+              errors.push({ row: rowNo, message: 'Password must be at least 6 characters.' });
+              continue;
+            }
+            const rec = await this.create({
+              username,
+              password,
+              full_name: String(raw.full_name || username).trim(),
+              email: String(raw.email || '').trim(),
+              role,
+              branch_id: role === USER_ROLES.BRANCH_USER ? branch.branch_id : '',
+              status: parseStatus(raw.status)
+            });
+            existing.push(rec);
+            created++;
+          }
+        } catch (err) {
+          errors.push({ row: rowNo, message: (err && err.message) || 'Invalid row' });
+        }
+      }
+      return { created, updated, skipped, errors };
     }
   };
 
@@ -159,6 +264,65 @@ export function createCatalog(store, cfg, ids, activity, auth) {
       const updated = await store.update('Branches', row, patch);
       await activity.log(null, 'branch_updated', 'branch', branchId, { status: patch.status || '' });
       return updated;
+    },
+    async importRows(rows) {
+      if (!Array.isArray(rows) || !rows.length) fail('validation', 'The file has no rows to import.');
+      const existing = await store.all('Branches');
+      let created = 0;
+      let updated = 0;
+      let skipped = 0;
+      const errors = [];
+      for (let i = 0; i < rows.length; i++) {
+        const raw = rows[i] || {};
+        const code = String(raw.branch_code || '').trim();
+        const name = String(raw.branch_name || '').trim();
+        const rowNo = parseInt(raw.row, 10) || (i + 2);
+        if (!name && !code) { skipped++; continue; }
+        if (code.toUpperCase() === 'EXAMPLE') { skipped++; continue; }
+        if (!name) {
+          errors.push({ row: rowNo, message: 'Branch name is required.' });
+          continue;
+        }
+        const payload = {
+          branch_name: name,
+          location: String(raw.location || '').trim(),
+          status: parseStatus(raw.status)
+        };
+        if (code) payload.branch_code = code;
+        const hit = code
+          ? existing.find((b) => String(b.branch_code || '').toLowerCase() === code.toLowerCase())
+          : null;
+        try {
+          if (hit) {
+            await this.update(hit.branch_id, payload);
+            Object.assign(hit, payload);
+            updated++;
+          } else {
+            const rec = await this.create(payload);
+            existing.push(rec);
+            created++;
+          }
+        } catch (err) {
+          errors.push({ row: rowNo, message: (err && err.message) || 'Invalid row' });
+        }
+      }
+      return { created, updated, skipped, errors };
+    },
+    async remove(branchId) {
+      const row = await store.find('Branches', 'branch_id', branchId);
+      if (!row) fail('not_found', 'Branch not found.');
+      const users = await store.all('Users');
+      if (users.some((u) => String(u.branch_id) === String(branchId))) {
+        fail('in_use', 'This branch still has users and cannot be deleted.');
+      }
+      const orders = await store.all('Orders');
+      if (orders.some((o) => String(o.branch_id) === String(branchId))) {
+        fail('in_use', 'This branch still has orders and cannot be deleted.');
+      }
+      await store.remove('Branch_Items', 'branch_id', branchId);
+      await store.remove('Branches', 'branch_id', branchId);
+      await activity.log(null, 'branch_deleted', 'branch', branchId, { code: row.branch_code });
+      return { ok: true };
     }
   };
 
@@ -249,6 +413,63 @@ export function createCatalog(store, cfg, ids, activity, auth) {
       const updated = await store.update('Items', row, patch);
       await activity.log(null, 'item_updated', 'item', itemId, {});
       return updated;
+    },
+    async remove(itemId) {
+      const row = await store.find('Items', 'item_id', itemId);
+      if (!row) fail('not_found', 'Item not found.');
+      const lines = await store.all('Order_Items');
+      if (lines.some((l) => String(l.item_id) === String(itemId))) {
+        fail('in_use', 'This item is used on orders and cannot be deleted.');
+      }
+      await store.remove('Branch_Items', 'item_id', itemId);
+      await store.remove('Items', 'item_id', itemId);
+      await activity.log(null, 'item_deleted', 'item', itemId, { name: row.item_name });
+      return { ok: true };
+    },
+    async importRows(rows) {
+      if (!Array.isArray(rows) || !rows.length) fail('validation', 'The file has no items.');
+      const existing = await store.all('Items');
+      let created = 0;
+      let updated = 0;
+      let skipped = 0;
+      const errors = [];
+      for (let i = 0; i < rows.length; i++) {
+        const raw = rows[i] || {};
+        const code = String(raw.item_code || '').trim();
+        const name = String(raw.item_name || '').trim();
+        const rowNo = parseInt(raw.row, 10) || (i + 2);
+        if (!name && !code) { skipped++; continue; }
+        if (code.toUpperCase() === 'EXAMPLE') { skipped++; continue; }
+        if (!name) {
+          errors.push({ row: rowNo, message: 'Item name is required.' });
+          continue;
+        }
+        const payload = {
+          item_name: name,
+          item_code: code,
+          category: String(raw.category || '').trim(),
+          unit: String(raw.unit || '').trim() || 'pc',
+          sort_order: parseInt(raw.sort_order, 10) || 0,
+          active: parseActive(raw.active)
+        };
+        const hit = code
+          ? existing.find((r) => String(r.item_code || '').toLowerCase() === code.toLowerCase())
+          : null;
+        try {
+          if (hit) {
+            await this.update(hit.item_id, payload);
+            Object.assign(hit, payload);
+            updated++;
+          } else {
+            const rec = await this.create(payload);
+            existing.push(rec);
+            created++;
+          }
+        } catch (err) {
+          errors.push({ row: rowNo, message: (err && err.message) || 'Invalid row' });
+        }
+      }
+      return { created, updated, skipped, errors };
     },
     async branchAssignments(branchId) {
       const branch = await store.find('Branches', 'branch_id', branchId);

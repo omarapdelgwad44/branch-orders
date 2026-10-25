@@ -35,6 +35,17 @@ export function createMemoryStore() {
       Object.assign(row, patch);
       return row;
     },
+    async remove(name, col, val) {
+      const list = rows(name);
+      const keep = [];
+      let n = 0;
+      for (const r of list) {
+        if (String(r[col]) === String(val)) n++;
+        else keep.push(r);
+      }
+      db[name] = keep;
+      return n;
+    },
     async getSetting(key, fallback) {
       const row = rows('Settings').find((r) => String(r.key) === String(key));
       if (!row) return fallback === undefined ? null : fallback;
