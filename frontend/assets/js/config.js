@@ -10,7 +10,7 @@ export const CONFIG = {
   LOGIN_HINTS: ['admin', 'embaba', 'toukh', 'masrrad', 'helwelsham', 'zakah',
     'bravocairo', 'bravoalexandria', 'kafrelsheikh', 'bahira',
     'qalyubiaelvan', 'qalyubiaef', 'mhicairo', 'mhisharqia', 'mhidakahlia',
-    'mhikafrelsheikh', 'mhimenoufia', 'mibeheira', 'mhialexandria'],
+    'mhikafrelsheikh', 'mhimenoufia', 'mibeheira', 'mhialexandria', 'novafoods'],
   STORAGE_KEYS: {
     token: 'bo.token',
     session: 'bo.session',
