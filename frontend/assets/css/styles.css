@@ -926,6 +926,111 @@ tr.av-off .badge.av-tag { display: inline-flex; }
   .tbl thead th:first-child, .tbl tbody td:first-child { position: static; box-shadow: none; }
 }
 
+/* Closed shutter. One paper notice, one warehouse stamp. */
+.halt {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 72px 20px 40px;
+  background:
+    repeating-linear-gradient(
+      180deg,
+      #102430 0 26px,
+      #0c1d27 26px 31px
+    );
+  color: #d7e3ea;
+}
+.halt-lang {
+  position: fixed;
+  top: 18px;
+  inset-inline-end: 18px;
+  background: rgba(247, 250, 251, .92);
+}
+.halt-sheet {
+  position: relative;
+  width: min(440px, 100%);
+  margin: 0;
+  padding: 72px 36px 32px;
+  background: #f4f8f9;
+  color: var(--ink);
+  box-shadow: 0 28px 70px -32px rgba(0, 0, 0, .72);
+}
+.halt-stamp {
+  position: absolute;
+  top: -34px;
+  inset-inline-start: 28px;
+  width: 96px;
+  height: 96px;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  border: 3px solid #9a3412;
+  border-radius: 50%;
+  color: #9a3412;
+  background: rgba(244, 248, 249, .94);
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1;
+  transform: rotate(-14deg);
+}
+.halt-sheet h1 {
+  font-size: clamp(2rem, 6vw, 2.6rem);
+  font-weight: 700;
+  line-height: 1.15;
+  margin: 0 0 12px;
+}
+.halt-sheet p {
+  margin: 0;
+  font-size: 1.2rem;
+  line-height: 1.45;
+  color: #1b3946;
+}
+.halt-brand {
+  margin-top: 28px;
+  font-size: .95rem;
+  color: #5d7682;
+}
+
+.dev-gate {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background: #0b1c26;
+}
+.dev-card {
+  width: min(400px, 100%);
+  margin: 0;
+  padding: 22px 22px 26px;
+  background: #f4f8f9;
+  color: var(--ink);
+}
+.dev-card-top { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.dev-card h1 { font-size: 1.55rem; margin: 0 0 8px; }
+.dev-lead { margin: 0 0 16px; color: var(--muted); line-height: 1.5; }
+.dev-state { margin: 0 0 16px; font-weight: 700; color: var(--primary-strong); }
+.dev-state.is-locked { color: var(--danger); }
+.dev-alert {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-radius: var(--radius-sm);
+}
+.dev-alert.hidden { display: none; }
+.dev-back {
+  display: inline-block;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: .92rem;
+}
+.dev-card .btn { margin-top: 4px; }
+
+@media (max-width: 640px) {
+  .halt-sheet { padding: 64px 22px 26px; }
+  .halt-stamp { inset-inline-start: 18px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
   .btn:hover, .chip-btn:hover { transform: none; }

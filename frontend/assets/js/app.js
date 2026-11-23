@@ -3,14 +3,15 @@
  */
 import { setLang, getLang, t } from './i18n.js';
 import { getSessionUser, setSessionUser } from './session.js';
-import { api, setToken, warmup } from './api.js';
+import { api, setToken, warmup, onSiteLocked } from './api.js';
 import { icon } from './icons.js';
 import { toast } from './ui.js';
 import * as loginView from './views/login.js';
 import * as branchView from './views/branch.js';
 import * as adminView from './views/admin.js';
+import * as lockView from './views/lock.js';
 
-let state = { user: getSessionUser() };
+let state = { user: getSessionUser(), locked: false };
 
 const parseHash = () => {
   const h = location.hash.replace(/^#\/?/, '');
@@ -35,6 +36,7 @@ const match = () => {
     { re: /^admin\/items$/, type: 'admin.items' },
     { re: /^admin\/availability$/, type: 'admin.availability' },
     { re: /^admin\/reports$/, type: 'admin.reports' },
+    { re: /^dev$/, type: 'dev' },
     { re: /^$/, type: 'root' }
   ];
   const full = parts.join('/');
@@ -206,6 +208,23 @@ function render() {
   const route = match();
   const app = document.getElementById('app');
 
+  if (route.type === 'dev') {
+    lockView.renderDev(app, {
+      locked: state.locked,
+      onLang: toggleLang,
+      onChanged: (locked) => {
+        state.locked = locked;
+        render();
+      }
+    });
+    return;
+  }
+
+  if (state.locked) {
+    lockView.renderStopped(app, { onLang: toggleLang });
+    return;
+  }
+
   if (!state.user) {
     app.innerHTML = '';
     loginView.render(app, { route, onLogin: (session, opts) => {
@@ -280,11 +299,27 @@ function notFound() {
     '<a class="btn btn-primary" href="#/app">' + t('common.back') + '</a></div>';
 }
 
+async function refreshLock() {
+  try {
+    const data = await api('system.maintenance.status');
+    state.locked = !!(data && data.locked);
+  } catch (e) {
+    state.locked = false;
+  }
+}
+
 export function start() {
   setLang(getLang());
   warmup();
-  render();
-  window.addEventListener('hashchange', render);
+  onSiteLocked(() => {
+    if (state.locked) return;
+    state.locked = true;
+    if (match().type !== 'dev') render();
+  });
+  refreshLock().finally(() => {
+    render();
+    window.addEventListener('hashchange', render);
+  });
 }
 
 export { state };

@@ -10,6 +10,7 @@ import { createMemoryStore } from '../supabase/functions/_shared/store-memory.mj
 import { createApp, dispatchHttp, jsonHeaders } from '../supabase/functions/_shared/handle.mjs';
 
 const PORT = Number(process.env.PORT || process.argv[2] || 8787);
+if (!process.env.DEVELOPER_LOCK_PASSWORD) process.env.DEVELOPER_LOCK_PASSWORD = 'DevLock@Test';
 const app = createApp(createMemoryStore());
 
 await app.direct.setupSystem();

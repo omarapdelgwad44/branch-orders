@@ -12,6 +12,7 @@ import { createCatalog } from './catalog.mjs';
 import { createOrders } from './orders.mjs';
 import { createReports, createActivity } from './reports.mjs';
 import { createSetup } from './setup.mjs';
+import { createMaintenance } from './maintenance.mjs';
 
 export function createApp(store) {
   const cfg = createConfig(store);
@@ -22,6 +23,7 @@ export function createApp(store) {
   const orders = createOrders(store, cfg, ids, activity, catalog.Items);
   const reports = createReports(store, cfg, activity);
   const setup = createSetup(store, cfg, ids, activity, auth);
+  const maintenance = createMaintenance(store);
 
   async function sysStatus() {
     await setup.setupSystem();
@@ -124,7 +126,14 @@ export function createApp(store) {
       guard: 'public',
       handler: (body) => setup.createFirstAdmin(String(body.username || ''), String(body.password || ''), String(body.full_name || ''))
     },
-    'system.setup.demo': { guard: 'public', handler: () => setup.loadDemoData() }
+    'system.setup.demo': { guard: 'public', handler: () => setup.loadDemoData() },
+    'system.maintenance.status': { guard: 'public', handler: () => maintenance.status() },
+    'system.maintenance.set': { guard: 'public', handler: (body) => maintenance.set(body) }
+  };
+
+  const OPEN_WHEN_LOCKED = {
+    'system.maintenance.status': true,
+    'system.maintenance.set': true
   };
 
   async function handle(body) {
@@ -135,6 +144,9 @@ export function createApp(store) {
       return { ok: false, error: { code: 'unknown_action', message: 'Unknown action: ' + action } };
     }
     try {
+      if (!OPEN_WHEN_LOCKED[action] && await maintenance.isLocked()) {
+        return { ok: false, error: { code: 'site_locked', message: 'The site is stopped. Please contact the developer.' } };
+      }
       let user = null;
       if (route.guard === 'auth' || route.guard === 'admin') {
         user = await auth.requireUser(token);

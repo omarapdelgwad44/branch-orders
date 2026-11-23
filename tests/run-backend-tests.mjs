@@ -8,6 +8,7 @@ import { createMemoryStore } from '../supabase/functions/_shared/store-memory.mj
 import { createApp } from '../supabase/functions/_shared/handle.mjs';
 import { runSharedSuite } from './shared-suite.mjs';
 
+process.env.DEVELOPER_LOCK_PASSWORD = process.env.DEVELOPER_LOCK_PASSWORD || 'DevLock@Test';
 const app = createApp(createMemoryStore());
 
 const host = {

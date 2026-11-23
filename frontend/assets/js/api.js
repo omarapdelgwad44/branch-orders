@@ -34,6 +34,13 @@ export function setToken(token, remember = true) {
   } catch (e) { return; }
 }
 
+let _onSiteLocked = null;
+
+/** Fired when the server refuses a call because the developer locked the site. */
+export function onSiteLocked(fn) {
+  _onSiteLocked = fn;
+}
+
 export class ApiError extends Error {
   constructor(code, message, details) {
     super(message);
@@ -85,6 +92,9 @@ export async function api(action, payload = {}) {
   if (json.ok !== true) {
     const code = (json.error && json.error.code) || 'error';
     const message = (json.error && json.error.message) || 'Request failed';
+    if (code === 'site_locked' && _onSiteLocked) {
+      try { _onSiteLocked(); } catch (e) { /* the page swap must not hide the error */ }
+    }
     throw new ApiError(code, message, json.error && json.error.details);
   }
   return json.data;

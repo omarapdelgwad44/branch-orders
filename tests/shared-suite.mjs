@@ -561,6 +561,42 @@ export async function runSharedSuite(host) {
   eq(selfDelete.error && selfDelete.error.code, 'delete_self', 'signed-in admin cannot delete themselves');
 
   // ---------------------------------------------------------------------------
+  // J. Developer site lock
+  // ---------------------------------------------------------------------------
+  section('J. Developer site lock');
+  const prevDevPassword = process.env.DEVELOPER_LOCK_PASSWORD;
+  process.env.DEVELOPER_LOCK_PASSWORD = 'DevLock@Test';
+
+  const open = await apiOk('system.maintenance.status');
+  eq(open.locked, false, 'site starts unlocked');
+
+  const denied = await api('system.maintenance.set', { password: 'wrong', locked: true });
+  eq(denied.ok, false, 'wrong developer password is refused');
+  eq(denied.error && denied.error.code, 'developer_denied', 'developer_denied for a bad password');
+  eq((await apiOk('system.maintenance.status')).locked, false, 'a bad password does not lock the site');
+
+  const locked = await apiOk('system.maintenance.set', { password: 'DevLock@Test', locked: true });
+  eq(locked.locked, true, 'developer password locks the site');
+
+  const adminWhileLocked = await api('auth.login', { username: 'admin', password: 'Admin@12345' });
+  eq(adminWhileLocked.ok, false, 'admin cannot sign in while the site is locked');
+  eq(adminWhileLocked.error && adminWhileLocked.error.code, 'site_locked', 'login returns site_locked');
+
+  const actionWhileLocked = await api('admin.orders', {}, adminTokenBack);
+  eq(actionWhileLocked.error && actionWhileLocked.error.code, 'site_locked', 'an existing admin session is locked out');
+
+  const stillVisible = await apiOk('system.maintenance.status');
+  eq(stillVisible.locked, true, 'lock status stays readable while the site is closed');
+
+  const unlocked = await apiOk('system.maintenance.set', { password: 'DevLock@Test', locked: false });
+  eq(unlocked.locked, false, 'the same password opens the site again');
+  const adminAfter = await api('auth.login', { username: 'admin', password: 'Admin@12345' });
+  eq(adminAfter.ok, true, 'admin can sign in after the developer opens the site');
+
+  if (prevDevPassword === undefined) delete process.env.DEVELOPER_LOCK_PASSWORD;
+  else process.env.DEVELOPER_LOCK_PASSWORD = prevDevPassword;
+
+  // ---------------------------------------------------------------------------
   // Summary
   // ---------------------------------------------------------------------------
   section('Result');
